@@ -221,28 +221,45 @@ export default function LoginPage() {
       }}
       data-ocid="login.page"
     >
+      <style>{`
+        @keyframes blobPulse1 {
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.15); opacity: 0.25; }
+        }
+        @keyframes blobPulse2 {
+          0%, 100% { transform: scale(1); opacity: 0.10; }
+          50% { transform: scale(1.2); opacity: 0.20; }
+        }
+        @keyframes rotateBorder {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes logoPulse {
+          0%, 100% { transform: scale(1); opacity: 0.4; }
+          50% { transform: scale(1.2); opacity: 0.8; }
+        }
+        @keyframes logoScale {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `}</style>
       <FloatingParticles />
 
-      <motion.div
-        animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
-        transition={{
-          duration: 6,
-          repeat: Number.POSITIVE_INFINITY,
-          ease: "easeInOut",
-        }}
+      <div
         className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none"
-        style={{ background: "oklch(0.55 0.25 260)", zIndex: 0 }}
-      />
-      <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
-        transition={{
-          duration: 8,
-          repeat: Number.POSITIVE_INFINITY,
-          ease: "easeInOut",
-          delay: 2,
+        style={{
+          background: "oklch(0.55 0.25 260)",
+          zIndex: 0,
+          animation: "blobPulse1 6s ease-in-out infinite",
         }}
+      />
+      <div
         className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full blur-3xl pointer-events-none"
-        style={{ background: "oklch(0.55 0.26 295)", zIndex: 0 }}
+        style={{
+          background: "oklch(0.55 0.26 295)",
+          zIndex: 0,
+          animation: "blobPulse2 8s ease-in-out 2s infinite",
+        }}
       />
 
       <motion.div
@@ -252,18 +269,13 @@ export default function LoginPage() {
         className="w-full max-w-md relative"
         style={{ zIndex: 1 }}
       >
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{
-            duration: 10,
-            repeat: Number.POSITIVE_INFINITY,
-            ease: "linear",
-          }}
+        <div
           className="absolute -inset-[2px] rounded-2xl pointer-events-none"
           style={{
             background:
               "conic-gradient(from 0deg, oklch(0.65 0.28 260), oklch(0.60 0.30 295), oklch(0.65 0.25 200), oklch(0.65 0.28 260))",
             zIndex: -1,
+            animation: "rotateBorder 10s linear infinite",
           }}
         />
 
@@ -288,33 +300,22 @@ export default function LoginPage() {
             className="flex flex-col items-center mb-8"
           >
             <div className="relative mb-4">
-              <motion.div
-                animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.8, 0.4] }}
-                transition={{
-                  duration: 2.5,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                }}
+              <div
                 className="absolute inset-0 rounded-2xl"
                 style={{
                   background:
                     "radial-gradient(circle, oklch(0.65 0.28 260 / 0.6) 0%, transparent 70%)",
                   transform: "scale(1.4)",
+                  animation: "logoPulse 2.5s ease-in-out infinite",
                 }}
               />
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{
-                  duration: 3,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "easeInOut",
-                  delay: 0.5,
-                }}
+              <div
                 className="w-24 h-24 rounded-2xl overflow-hidden relative"
                 style={{
                   boxShadow:
                     "0 0 30px oklch(0.60 0.28 260 / 0.5), 0 0 60px oklch(0.60 0.28 260 / 0.25)",
                   border: "2px solid oklch(0.55 0.22 260 / 0.5)",
+                  animation: "logoScale 3s ease-in-out 0.5s infinite",
                 }}
               >
                 <img
@@ -331,7 +332,7 @@ export default function LoginPage() {
                     }
                   }}
                 />
-              </motion.div>
+              </div>
             </div>
 
             <h1

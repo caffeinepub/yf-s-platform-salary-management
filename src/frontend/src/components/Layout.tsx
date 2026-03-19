@@ -201,7 +201,7 @@ export default function Layout({
       {/* Desktop Sidebar */}
       <motion.aside
         animate={{ width: collapsed ? 64 : 240 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
         className="hidden md:flex flex-col bg-sidebar border-r border-sidebar-border relative flex-shrink-0 overflow-hidden"
       >
         <SidebarContent />
@@ -235,7 +235,7 @@ export default function Layout({
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
-              transition={{ type: "spring", damping: 25 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="md:hidden fixed left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-sidebar-border z-50"
             >
               <button

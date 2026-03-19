@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Building2, FileText, Home, LogOut, User } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AttendancePage from "./pages/AttendancePage";
@@ -40,6 +40,10 @@ const EMP_NAV = [
 function EmployeeApp() {
   const { username, logout } = useAuth();
   const [page, setPage] = useState<EmpPage>("dashboard");
+
+  useEffect(() => {
+    document.title = "Yf's Platform | Salary Management";
+  }, []);
 
   const renderPage = () => {
     switch (page) {
@@ -190,6 +194,14 @@ function EmployeeApp() {
 function AppInner() {
   const { isAuthenticated, role } = useAuth();
   const [currentPage, setCurrentPage] = useState<PageName>("dashboard");
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      document.title = "Yf's Platform";
+    } else if (role === "admin") {
+      document.title = "Yf's Platform | Salary Management";
+    }
+  }, [isAuthenticated, role]);
 
   if (!isAuthenticated) {
     return <LoginPage />;

@@ -146,3 +146,19 @@
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(var(--muted-foreground));
 }
+
+/* Ensure typed text in inputs is always clearly visible */
+input,
+textarea,
+select {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  -webkit-text-fill-color: #1a1a1a !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #888888 !important;
+  -webkit-text-fill-color: #888888 !important;
+  opacity: 1;
+}

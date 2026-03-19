@@ -91,21 +91,27 @@ function calcForMonth(employees: StoredEmployee[]) {
       const pf = Math.round(basic * 0.12);
       const esic = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
       let pt = 0;
-      if (gross > 20000) pt = 200;
-      else if (gross > 15000) pt = 150;
-      else if (gross > 10000) pt = 100;
-      const annualTaxable = gross * 12;
+      // Professional Tax: based on annual gross
+      const annualGross = gross * 12;
+      if (annualGross >= 400000) pt = 208;
+      else if (annualGross >= 300000) pt = 167;
+      else if (annualGross >= 225000) pt = 125;
+      // Income Tax: new regime slabs
+      const annualTaxable = annualGross;
       let annualIT = 0;
-      if (annualTaxable > 1500000)
-        annualIT = (annualTaxable - 1500000) * 0.3 + 150000;
+      if (annualTaxable > 2400000)
+        annualIT = (annualTaxable - 2400000) * 0.3 + 300000;
+      else if (annualTaxable > 2000000)
+        annualIT = (annualTaxable - 2000000) * 0.25 + 200000;
+      else if (annualTaxable > 1600000)
+        annualIT = (annualTaxable - 1600000) * 0.2 + 120000;
       else if (annualTaxable > 1200000)
-        annualIT = (annualTaxable - 1200000) * 0.2 + 90000;
-      else if (annualTaxable > 900000)
-        annualIT = (annualTaxable - 900000) * 0.15 + 45000;
-      else if (annualTaxable > 600000)
-        annualIT = (annualTaxable - 600000) * 0.1 + 15000;
-      else if (annualTaxable > 300000)
-        annualIT = (annualTaxable - 300000) * 0.05;
+        annualIT = (annualTaxable - 1200000) * 0.15 + 60000;
+      else if (annualTaxable > 800000)
+        annualIT = (annualTaxable - 800000) * 0.1 + 20000;
+      else if (annualTaxable > 400000)
+        annualIT = (annualTaxable - 400000) * 0.05;
+      if (annualTaxable <= 700000 && annualIT <= 25000) annualIT = 0;
       const it = Math.round(annualIT / 12);
       const net = gross - pf - esic - pt - it;
       return {

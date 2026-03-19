@@ -36,8 +36,11 @@ import {
   Building2,
   Calendar,
   Camera,
+  Car,
   CreditCard,
   DollarSign,
+  Download,
+  FileUp,
   Filter,
   History,
   Loader2,
@@ -54,7 +57,7 @@ import {
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Designation,
@@ -68,23 +71,416 @@ import {
   useUpdateEmployee,
 } from "../hooks/useQueries";
 
-const DESIGNATIONS = [
-  { value: Designation.researchEngineer, label: "Research Engineer" },
-  { value: Designation.professor, label: "Professor" },
-  { value: Designation.lecturer, label: "Lecturer" },
-  { value: Designation.humanResources, label: "Human Resources" },
-  { value: Designation.adminStaff, label: "Admin Staff" },
-  { value: Designation.officer, label: "Officer" },
-  { value: Designation.scientist, label: "Scientist" },
+const DESIGNATIONS_GROUPED: {
+  header?: string;
+  value?: string;
+  label: string;
+  disabled?: boolean;
+}[] = [
+  // ===== SCHOOL =====
+  { header: "-- School --", label: "-- School --", disabled: true },
+  { value: "Principal", label: "Principal" },
+  { value: "Vice Principal", label: "Vice Principal" },
+  { value: "HOI (Head of Institution)", label: "HOI (Head of Institution)" },
+  { value: "Headmaster", label: "Headmaster" },
+  { value: "Headmistress", label: "Headmistress" },
+  { value: "Deputy Headmaster", label: "Deputy Headmaster" },
+  {
+    value: "PGT (Post Graduate Teacher)",
+    label: "PGT (Post Graduate Teacher)",
+  },
+  {
+    value: "TGT (Trained Graduate Teacher)",
+    label: "TGT (Trained Graduate Teacher)",
+  },
+  { value: "PRT (Primary Teacher)", label: "PRT (Primary Teacher)" },
+  { value: "NTT (Nursery Teacher)", label: "NTT (Nursery Teacher)" },
+  { value: "Senior Teacher", label: "Senior Teacher" },
+  { value: "Teacher", label: "Teacher" },
+  { value: "Assistant Teacher", label: "Assistant Teacher" },
+  { value: "Primary Teacher", label: "Primary Teacher" },
+  { value: "Physical Education Teacher", label: "Physical Education Teacher" },
+  {
+    value: "PET (Physical Education Teacher)",
+    label: "PET (Physical Education Teacher)",
+  },
+  { value: "Drawing Teacher", label: "Drawing Teacher" },
+  { value: "Music Teacher", label: "Music Teacher" },
+  { value: "Art & Craft Teacher", label: "Art & Craft Teacher" },
+  { value: "Dance Teacher", label: "Dance Teacher" },
+  { value: "Library Teacher", label: "Library Teacher" },
+  { value: "Librarian", label: "Librarian" },
+  { value: "Assistant Librarian", label: "Assistant Librarian" },
+  { value: "Lab Assistant", label: "Lab Assistant" },
+  { value: "Computer Teacher", label: "Computer Teacher" },
+  { value: "Tutor", label: "Tutor" },
+  { value: "Special Educator", label: "Special Educator" },
+  { value: "Counsellor", label: "Counsellor" },
+  { value: "School Nurse", label: "School Nurse" },
+  // ===== COLLEGE =====
+  {
+    header: "-- College / University --",
+    label: "-- College / University --",
+    disabled: true,
+  },
+  { value: "Vice Chancellor", label: "Vice Chancellor" },
+  { value: "Pro Vice Chancellor", label: "Pro Vice Chancellor" },
+  { value: "Registrar", label: "Registrar" },
+  { value: "Dean", label: "Dean" },
+  { value: "Associate Dean", label: "Associate Dean" },
+  { value: "Professor", label: "Professor" },
+  { value: "Associate Professor", label: "Associate Professor" },
+  { value: "Assistant Professor", label: "Assistant Professor" },
+  { value: "Senior Lecturer", label: "Senior Lecturer" },
+  { value: "Lecturer", label: "Lecturer" },
+  { value: "Assistant Lecturer", label: "Assistant Lecturer" },
+  { value: "Guest Lecturer", label: "Guest Lecturer" },
+  { value: "Visiting Faculty", label: "Visiting Faculty" },
+  { value: "Research Scholar", label: "Research Scholar" },
+  { value: "HOD (Head of Department)", label: "HOD (Head of Department)" },
+  { value: "Coordinator", label: "Coordinator" },
+  { value: "Academic Coordinator", label: "Academic Coordinator" },
+  { value: "Examination Controller", label: "Examination Controller" },
+  { value: "Admission Officer", label: "Admission Officer" },
+  { value: "College Librarian", label: "College Librarian" },
+  { value: "Lab Incharge", label: "Lab Incharge" },
+  // ===== HOSTEL =====
+  { header: "-- Hostel --", label: "-- Hostel --", disabled: true },
+  { value: "Chief Warden", label: "Chief Warden" },
+  { value: "Hostel Warden", label: "Hostel Warden" },
+  { value: "Assistant Warden", label: "Assistant Warden" },
+  { value: "Deputy Warden", label: "Deputy Warden" },
+  { value: "Hostel Superintendent", label: "Hostel Superintendent" },
+  { value: "Hostel Supervisor", label: "Hostel Supervisor" },
+  { value: "Hostel Manager", label: "Hostel Manager" },
+  { value: "Caretaker", label: "Caretaker" },
+  { value: "Hostel Attendant", label: "Hostel Attendant" },
+  { value: "Matron", label: "Matron" },
+  { value: "Cook", label: "Cook" },
+  { value: "Head Cook", label: "Head Cook" },
+  { value: "Assistant Cook", label: "Assistant Cook" },
+  { value: "Kitchen Helper", label: "Kitchen Helper" },
+  { value: "Housekeeping Staff", label: "Housekeeping Staff" },
+  { value: "Night Watchman", label: "Night Watchman" },
+  { value: "Mess Manager", label: "Mess Manager" },
+  { value: "Mess Supervisor", label: "Mess Supervisor" },
+  // ===== OFFICE =====
+  {
+    header: "-- Office / Administration --",
+    label: "-- Office / Administration --",
+    disabled: true,
+  },
+  { value: "Director", label: "Director" },
+  { value: "Managing Director", label: "Managing Director" },
+  { value: "Chief Executive Officer", label: "Chief Executive Officer" },
+  { value: "General Manager", label: "General Manager" },
+  { value: "Deputy General Manager", label: "Deputy General Manager" },
+  { value: "Assistant General Manager", label: "Assistant General Manager" },
+  { value: "Manager", label: "Manager" },
+  { value: "Deputy Manager", label: "Deputy Manager" },
+  { value: "Assistant Manager", label: "Assistant Manager" },
+  { value: "Superintendent", label: "Superintendent" },
+  { value: "Section Officer", label: "Section Officer" },
+  { value: "Deputy Section Officer", label: "Deputy Section Officer" },
+  { value: "Assistant Section Officer", label: "Assistant Section Officer" },
+  { value: "Office Superintendent", label: "Office Superintendent" },
+  { value: "Administrative Officer", label: "Administrative Officer" },
+  { value: "Admin Manager", label: "Admin Manager" },
+  { value: "Administrative Assistant", label: "Administrative Assistant" },
+  { value: "Office Assistant", label: "Office Assistant" },
+  { value: "Assistant", label: "Assistant" },
+  { value: "Senior Assistant", label: "Senior Assistant" },
+  { value: "Junior Assistant", label: "Junior Assistant" },
+  { value: "Supervisor", label: "Supervisor" },
+  { value: "Executive", label: "Executive" },
+  { value: "Senior Executive", label: "Senior Executive" },
+  { value: "Junior Executive", label: "Junior Executive" },
+  { value: "Officer", label: "Officer" },
+  { value: "Inspector", label: "Inspector" },
+  { value: "Personal Assistant", label: "Personal Assistant" },
+  { value: "Receptionist", label: "Receptionist" },
+  { value: "Front Desk Officer", label: "Front Desk Officer" },
+  { value: "Clerk", label: "Clerk" },
+  { value: "Senior Clerk", label: "Senior Clerk" },
+  { value: "Junior Clerk", label: "Junior Clerk" },
+  { value: "Record Keeper", label: "Record Keeper" },
+  { value: "Time Keeper", label: "Time Keeper" },
+  { value: "Data Entry Operator", label: "Data Entry Operator" },
+  { value: "Liaison Officer", label: "Liaison Officer" },
+  {
+    value: "PRO (Public Relations Officer)",
+    label: "PRO (Public Relations Officer)",
+  },
+  // ===== HR =====
+  {
+    header: "-- HR & Recruitment --",
+    label: "-- HR & Recruitment --",
+    disabled: true,
+  },
+  { value: "HR Manager", label: "HR Manager" },
+  { value: "HR Officer", label: "HR Officer" },
+  { value: "HR Assistant", label: "HR Assistant" },
+  { value: "Recruitment Officer", label: "Recruitment Officer" },
+  { value: "Training Officer", label: "Training Officer" },
+  { value: "Payroll Officer", label: "Payroll Officer" },
+  // ===== FINANCE & ACCOUNTS =====
+  {
+    header: "-- Finance & Accounts --",
+    label: "-- Finance & Accounts --",
+    disabled: true,
+  },
+  { value: "Chief Financial Officer", label: "Chief Financial Officer" },
+  { value: "Finance Manager", label: "Finance Manager" },
+  { value: "Finance Officer", label: "Finance Officer" },
+  { value: "Accounts Manager", label: "Accounts Manager" },
+  { value: "Senior Accountant", label: "Senior Accountant" },
+  { value: "Accountant", label: "Accountant" },
+  { value: "Account Assistant", label: "Account Assistant" },
+  { value: "Junior Accountant", label: "Junior Accountant" },
+  { value: "Cashier", label: "Cashier" },
+  { value: "Auditor", label: "Auditor" },
+  { value: "Internal Auditor", label: "Internal Auditor" },
+  { value: "CA (Chartered Accountant)", label: "CA (Chartered Accountant)" },
+  { value: "CMA (Cost Accountant)", label: "CMA (Cost Accountant)" },
+  { value: "Tax Consultant", label: "Tax Consultant" },
+  { value: "Tax Officer", label: "Tax Officer" },
+  { value: "Billing Clerk", label: "Billing Clerk" },
+  { value: "Budget Analyst", label: "Budget Analyst" },
+  // ===== PURCHASE & STORE =====
+  {
+    header: "-- Purchase & Store --",
+    label: "-- Purchase & Store --",
+    disabled: true,
+  },
+  { value: "Purchase Manager", label: "Purchase Manager" },
+  { value: "Purchase Officer", label: "Purchase Officer" },
+  { value: "Purchase Assistant", label: "Purchase Assistant" },
+  { value: "Store Manager", label: "Store Manager" },
+  { value: "Store Keeper", label: "Store Keeper" },
+  { value: "Store Assistant", label: "Store Assistant" },
+  { value: "Inventory Controller", label: "Inventory Controller" },
+  { value: "Logistics Officer", label: "Logistics Officer" },
+  { value: "Supply Chain Officer", label: "Supply Chain Officer" },
+  // ===== IT & TECHNICAL =====
+  {
+    header: "-- IT & Technical --",
+    label: "-- IT & Technical --",
+    disabled: true,
+  },
+  { value: "IT Manager", label: "IT Manager" },
+  { value: "System Administrator", label: "System Administrator" },
+  { value: "Network Engineer", label: "Network Engineer" },
+  { value: "Software Developer", label: "Software Developer" },
+  { value: "Technical Support Officer", label: "Technical Support Officer" },
+  { value: "Computer Operator", label: "Computer Operator" },
+  { value: "Lab Technician", label: "Lab Technician" },
+  { value: "Electronics Technician", label: "Electronics Technician" },
+  { value: "Electrician", label: "Electrician" },
+  { value: "Plumber", label: "Plumber" },
+  { value: "Carpenter", label: "Carpenter" },
+  { value: "Mechanic", label: "Mechanic" },
+  // ===== SECURITY & SUPPORT =====
+  {
+    header: "-- Security & Support --",
+    label: "-- Security & Support --",
+    disabled: true,
+  },
+  { value: "Security Officer", label: "Security Officer" },
+  { value: "Security Guard", label: "Security Guard" },
+  { value: "Watchman", label: "Watchman" },
+  { value: "Peon", label: "Peon" },
+  { value: "Attender", label: "Attender" },
+  { value: "Office Boy", label: "Office Boy" },
+  { value: "Driver", label: "Driver" },
+  { value: "Sweeper", label: "Sweeper" },
+  { value: "Gardner", label: "Gardner" },
+  { value: "Sanitation Worker", label: "Sanitation Worker" },
 ];
 
-const designationLabel = (d: Designation) =>
-  DESIGNATIONS.find((x) => x.value === d)?.label ?? d;
+function mapDesignationToEnum(d: string): Designation {
+  const academic = [
+    "Principal",
+    "Vice Principal",
+    "HOI (Head of Institution)",
+    "Headmaster",
+    "Headmistress",
+    "Deputy Headmaster",
+    "PGT (Post Graduate Teacher)",
+    "TGT (Trained Graduate Teacher)",
+    "PRT (Primary Teacher)",
+    "NTT (Nursery Teacher)",
+    "Senior Teacher",
+    "Teacher",
+    "Assistant Teacher",
+    "Primary Teacher",
+    "Physical Education Teacher",
+    "PET (Physical Education Teacher)",
+    "Drawing Teacher",
+    "Music Teacher",
+    "Art & Craft Teacher",
+    "Dance Teacher",
+    "Library Teacher",
+    "Librarian",
+    "Assistant Librarian",
+    "Lab Assistant",
+    "Computer Teacher",
+    "Tutor",
+    "Special Educator",
+    "Counsellor",
+    "School Nurse",
+    "Chief Warden",
+    "Hostel Warden",
+    "Assistant Warden",
+    "Deputy Warden",
+    "Hostel Superintendent",
+    "Hostel Supervisor",
+    "Hostel Manager",
+    "Caretaker",
+    "Hostel Attendant",
+    "Matron",
+    "Mess Manager",
+    "Mess Supervisor",
+  ];
+  const lecture = [
+    "Vice Chancellor",
+    "Pro Vice Chancellor",
+    "Registrar",
+    "Dean",
+    "Associate Dean",
+    "Professor",
+    "Associate Professor",
+    "Assistant Professor",
+    "Senior Lecturer",
+    "Lecturer",
+    "Assistant Lecturer",
+    "Guest Lecturer",
+    "Visiting Faculty",
+    "Research Scholar",
+    "HOD (Head of Department)",
+    "Coordinator",
+    "Academic Coordinator",
+    "Examination Controller",
+    "Admission Officer",
+    "College Librarian",
+    "Lab Incharge",
+  ];
+  const finance = [
+    "Chief Financial Officer",
+    "Finance Manager",
+    "Finance Officer",
+    "Accounts Manager",
+    "Senior Accountant",
+    "Accountant",
+    "Account Assistant",
+    "Junior Accountant",
+    "Cashier",
+    "Auditor",
+    "Internal Auditor",
+    "CA (Chartered Accountant)",
+    "CMA (Cost Accountant)",
+    "Tax Consultant",
+    "Tax Officer",
+    "Billing Clerk",
+    "Budget Analyst",
+    "Purchase Manager",
+    "Purchase Officer",
+    "Purchase Assistant",
+    "Store Manager",
+    "Store Keeper",
+    "Store Assistant",
+    "Inventory Controller",
+    "Logistics Officer",
+    "Supply Chain Officer",
+    "Payroll Officer",
+  ];
+  const officer = [
+    "Director",
+    "Managing Director",
+    "Chief Executive Officer",
+    "General Manager",
+    "Deputy General Manager",
+    "Assistant General Manager",
+    "Manager",
+    "Deputy Manager",
+    "Assistant Manager",
+    "Superintendent",
+    "Section Officer",
+    "Deputy Section Officer",
+    "Assistant Section Officer",
+    "Office Superintendent",
+    "Administrative Officer",
+    "Admin Manager",
+    "Administrative Assistant",
+    "Office Assistant",
+    "Assistant",
+    "Senior Assistant",
+    "Junior Assistant",
+    "Supervisor",
+    "Executive",
+    "Senior Executive",
+    "Junior Executive",
+    "Officer",
+    "Inspector",
+    "Personal Assistant",
+    "Receptionist",
+    "Front Desk Officer",
+    "Clerk",
+    "Senior Clerk",
+    "Junior Clerk",
+    "Record Keeper",
+    "Time Keeper",
+    "Data Entry Operator",
+    "Liaison Officer",
+    "PRO (Public Relations Officer)",
+    "HR Manager",
+    "HR Officer",
+    "HR Assistant",
+    "Recruitment Officer",
+    "Training Officer",
+    "IT Manager",
+    "System Administrator",
+    "Network Engineer",
+    "Software Developer",
+    "Technical Support Officer",
+    "Computer Operator",
+    "Lab Technician",
+    "Electronics Technician",
+    "Electrician",
+    "Plumber",
+    "Carpenter",
+    "Mechanic",
+    "Security Officer",
+    "Security Guard",
+    "Watchman",
+    "Peon",
+    "Attender",
+    "Office Boy",
+    "Driver",
+    "Sweeper",
+    "Gardner",
+    "Sanitation Worker",
+    "Cook",
+    "Head Cook",
+    "Assistant Cook",
+    "Kitchen Helper",
+    "Housekeeping Staff",
+    "Night Watchman",
+  ];
+  if (lecture.includes(d)) return Designation.lecturer;
+  if (academic.includes(d)) return Designation.adminStaff;
+  if (finance.includes(d)) return Designation.humanResources;
+  if (officer.includes(d)) return Designation.officer;
+  if (Object.values(Designation).includes(d as Designation))
+    return d as Designation;
+  return Designation.adminStaff;
+}
+
+const designationLabel = (d: string) => d || "—";
 
 interface EmpForm {
   name: string;
   employeeId: string;
-  designation: Designation | "";
+  designation: string;
   department: string;
   instituteId: string;
   address: string;
@@ -101,6 +497,7 @@ interface EmpForm {
   joiningDate: string;
   // Salary & Banking
   basicSalary: string;
+  ta: string;
   bankName: string;
   bankBranch: string;
   bankAccountNo: string;
@@ -127,11 +524,12 @@ const EMPTY_FORM: EmpForm = {
   gender: "",
   category: "",
   employeeType: "",
-  employeeStatus: "",
+  employeeStatus: "active",
   phone: "",
   emailId: "",
   joiningDate: "",
   basicSalary: "",
+  ta: "",
   bankName: "",
   bankBranch: "",
   bankAccountNo: "",
@@ -278,7 +676,7 @@ export default function EmployeeManagementPage() {
       religion: extra.religion || "",
       gender: extra.gender || "",
       category: extra.category || "",
-      employeeType: emp.employmentType,
+      employeeType: emp.employmentType as EmploymentType | "",
       employeeStatus: extra.employeeStatus || "",
       phone: extra.phone || "",
       emailId: extra.emailId || extra.email || "",
@@ -294,9 +692,158 @@ export default function EmployeeManagementPage() {
       aadhaarNo: extra.aadhaarNo || extra.aadharNumber || "",
       uanNo: extra.uanNo || "",
       licNo: extra.licNo || "",
+      ta: String(extra.ta || "0"),
     });
     setFormOpen(true);
   };
+
+  const xlsxFileRef = useRef<HTMLInputElement>(null);
+
+  const downloadSampleFile = useCallback(() => {
+    const rows = [
+      ["slno", "staffno", "name", "designation", "institute", "status"],
+      ["1", "EMP001", "John Doe", "Manager", "Institute A", "regular"],
+      ["2", "EMP002", "Jane Smith", "Lecturer", "Institute B", "temporary"],
+    ];
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sample_employees.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleBulkUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = "";
+      try {
+        const text = await file.text();
+        const lines = text
+          .trim()
+          .split("\n")
+          .map((l: string) => l.replace(/\r$/, ""));
+        if (lines.length < 2) {
+          toast.error("No data found in file");
+          return;
+        }
+        const headers = lines[0]
+          .split(",")
+          .map((h) => h.trim().replace(/^"|"$/g, ""));
+        const rows: any[] = lines.slice(1).map((line) => {
+          const vals = line
+            .split(",")
+            .map((v) => v.trim().replace(/^"|"$/g, ""));
+          const obj: any = {};
+          headers.forEach((h, i) => {
+            obj[h] = vals[i] || "";
+          });
+          return obj;
+        });
+        if (!rows.length) {
+          toast.error("No data found in file");
+          return;
+        }
+        let added = 0;
+        let failed = 0;
+        for (const row of rows) {
+          const staffno = String(row.staffno || row.id || "").trim();
+          const name = String(row.name || "").trim();
+          const designation = String(row.designation || "").trim();
+          const institute = String(row.institute || "").trim();
+          const status = String(row.status || "regular")
+            .trim()
+            .toLowerCase();
+          if (!staffno || !name) {
+            failed++;
+            continue;
+          }
+          // Find matching institute
+          const matchedInstitute = institutes.find(
+            (i: Institute) =>
+              i.name.toLowerCase().includes(institute.toLowerCase()) ||
+              institute.toLowerCase().includes(i.name.toLowerCase()),
+          );
+          const instId = matchedInstitute?.id ?? institutes[0]?.id;
+          if (!instId) {
+            failed++;
+            continue;
+          }
+          // Map designation string to enum
+          const desigMap: Record<string, Designation> = {
+            "research engineer": Designation.researchEngineer,
+            professor: Designation.professor,
+            lecturer: Designation.lecturer,
+            "human resources": Designation.humanResources,
+            "admin staff": Designation.adminStaff,
+            officer: Designation.officer,
+            scientist: Designation.scientist,
+            manager: Designation.officer,
+          };
+          const desigKey = designation.toLowerCase();
+          const mappedDesig =
+            Object.entries(desigMap).find(([k]) => desigKey.includes(k))?.[1] ??
+            Designation.officer;
+          const empType =
+            status === "regular"
+              ? EmploymentType.regular
+              : EmploymentType.temporary;
+          try {
+            await addMutation.mutateAsync({
+              name,
+              employeeId: staffno,
+              instituteId: BigInt(instId),
+              designation: mappedDesig,
+              employmentType: empType,
+              joiningDate: new Date().toISOString().split("T")[0],
+              address: "-",
+              dob: "2000-01-01",
+              basicSalary: BigInt(0),
+            });
+            // Auto-generate credentials
+            const autoUser = (
+              name.toLowerCase().replace(/\s/g, "").slice(0, 4) + staffno
+            ).toLowerCase();
+            let creds: any[] = [];
+            try {
+              creds = JSON.parse(
+                localStorage.getItem("employeeCredentials") || "[]",
+              );
+            } catch {
+              creds = [];
+            }
+            const idx = creds.findIndex((c: any) => c.employeeId === staffno);
+            const credObj = {
+              username: autoUser,
+              password: autoUser,
+              employeeId: staffno,
+              name,
+            };
+            if (idx >= 0) creds[idx] = credObj;
+            else creds.push(credObj);
+            localStorage.setItem("employeeCredentials", JSON.stringify(creds));
+            added++;
+          } catch {
+            failed++;
+          }
+        }
+        if (added > 0)
+          toast.success(
+            `Added ${added} employee${added > 1 ? "s" : ""} successfully${failed > 0 ? `, ${failed} failed` : ""}`,
+          );
+        else
+          toast.error(
+            `Failed to add employees${failed > 0 ? ` (${failed} rows had errors)` : ""}`,
+          );
+      } catch {
+        toast.error("Failed to parse file. Please check the format.");
+      }
+    },
+    [institutes, addMutation],
+  );
 
   const setField = (field: keyof EmpForm, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -325,7 +872,7 @@ export default function EmployeeManagementPage() {
       name: form.name,
       employeeId: form.employeeId,
       instituteId: BigInt(form.instituteId),
-      designation: form.designation as Designation,
+      designation: mapDesignationToEnum(form.designation),
       employmentType: form.employeeType as EmploymentType,
       joiningDate: form.joiningDate || new Date().toISOString().split("T")[0],
       address: form.address || "-",
@@ -360,6 +907,7 @@ export default function EmployeeManagementPage() {
         aadhaarNo: form.aadhaarNo,
         uanNo: form.uanNo,
         licNo: form.licNo,
+        ta: Number(form.ta) || 0,
         designation: form.designation,
         institute:
           institutes.find(
@@ -448,13 +996,39 @@ export default function EmployeeManagementPage() {
             Manage all staff and personnel
           </p>
         </div>
-        <Button
-          onClick={openAdd}
-          className="gradient-primary text-white border-0 glow-primary gap-2"
-          data-ocid="employees.add_button"
-        >
-          <Plus className="w-4 h-4" /> Add Employee
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            ref={xlsxFileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleBulkUpload}
+            data-ocid="employees.upload_button"
+          />
+          <Button
+            variant="outline"
+            className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+            onClick={downloadSampleFile}
+            data-ocid="employees.secondary_button"
+          >
+            <Download className="w-4 h-4" /> Sample File
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+            onClick={() => xlsxFileRef.current?.click()}
+            data-ocid="employees.upload_button"
+          >
+            <FileUp className="w-4 h-4" /> Upload Excel
+          </Button>
+          <Button
+            onClick={openAdd}
+            className="gradient-primary text-white border-0 glow-primary gap-2"
+            data-ocid="employees.add_button"
+          >
+            <Plus className="w-4 h-4" /> Add Employee
+          </Button>
+        </div>
       </motion.div>
 
       {/* Filters */}
@@ -800,11 +1374,22 @@ export default function EmployeeManagementPage() {
                           <SelectValue placeholder="Select designation" />
                         </SelectTrigger>
                         <SelectContent>
-                          {DESIGNATIONS.map((d) => (
-                            <SelectItem key={d.value} value={d.value}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
+                          {DESIGNATIONS_GROUPED.map((d) =>
+                            d.disabled ? (
+                              <SelectItem
+                                key={d.label}
+                                value={d.label}
+                                disabled
+                                className="font-bold text-xs text-muted-foreground uppercase py-1"
+                              >
+                                {d.label}
+                              </SelectItem>
+                            ) : (
+                              <SelectItem key={d.value} value={d.value!}>
+                                {d.label}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -878,13 +1463,36 @@ export default function EmployeeManagementPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Religion</Label>
-                      <Input
+                      <Select
                         value={form.religion}
-                        onChange={(e) => setField("religion", e.target.value)}
-                        placeholder="e.g., Hindu"
-                        className={inputCls}
-                        data-ocid="employees.religion.input"
-                      />
+                        onValueChange={(v) => setField("religion", v)}
+                      >
+                        <SelectTrigger
+                          className={inputCls}
+                          data-ocid="employees.religion.select"
+                        >
+                          <SelectValue placeholder="Select religion" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            "Hindu",
+                            "Muslim",
+                            "Christian",
+                            "Sikh",
+                            "Buddhist",
+                            "Jain",
+                            "Zoroastrian (Parsi)",
+                            "Jewish",
+                            "Bahá'í",
+                            "Tribal Religion",
+                            "Other",
+                          ].map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Gender</Label>
@@ -1057,6 +1665,20 @@ export default function EmployeeManagementPage() {
                         placeholder="e.g., 25000"
                         className={inputCls}
                         data-ocid="employees.salary.input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-xs">
+                        <Car className="w-3 h-3" />
+                        TA - Travel Allowance (₹)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={form.ta}
+                        onChange={(e) => setField("ta", e.target.value)}
+                        placeholder="e.g., 1500"
+                        className={inputCls}
+                        data-ocid="employees.ta.input"
                       />
                     </div>
                     <div className="space-y-1.5">

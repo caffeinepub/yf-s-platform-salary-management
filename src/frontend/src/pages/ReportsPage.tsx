@@ -72,20 +72,107 @@ type StoredSalary = {
   employeeId: string;
   month: string;
   year: string;
-  basic: number;
-  da: number;
-  hra: number;
-  ta: number;
-  gross: number;
-  pf: number;
-  esic: number;
-  pt: number;
-  it: number;
-  totalDeductions: number;
-  net: number;
-  employmentType: string;
+  // Fields from ReportsPage calcSalaryComponents (fallback)
+  basic?: number;
+  da?: number;
+  hra?: number;
+  ta?: number;
+  gross?: number;
+  pf?: number;
+  esic?: number;
+  pt?: number;
+  it?: number;
+  net?: number;
+  // Fields from SalaryProcessingPage (saved records)
+  basicPay?: number;
+  specialPay?: number;
+  daPercent?: number;
+  hraPercent?: number;
+  bonus?: number;
+  daArrears?: number;
+  conveyanceAllowance?: number;
+  washingAllowance?: number;
+  ltc?: number;
+  festivalAdvance?: number;
+  incentive?: number;
+  otherEarnings?: number;
+  grossEarnings?: number;
+  houseRent?: number;
+  electricityCharges?: number;
+  lwf?: number;
+  epf?: number;
+  vpf?: number;
+  lic?: number;
+  profTax?: number;
+  incomeTax?: number;
+  festival?: number;
+  esi?: number;
+  security?: number;
+  otherDeductions?: number;
+  totalDeductions?: number;
+  netEarnings?: number;
+  lwp?: number;
+  employmentType?: string;
   locked: boolean;
 };
+
+function numberToWords(num: number): string {
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  function twoDigits(n: number): string {
+    if (n < 20) return ones[n];
+    return `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ""}`;
+  }
+  function threeDigits(n: number): string {
+    if (n >= 100)
+      return `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${twoDigits(n % 100)}` : ""}`;
+    return twoDigits(n);
+  }
+  const n = Math.round(num);
+  if (n === 0) return "Zero";
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+  let result = "";
+  if (crore) result += `${threeDigits(crore)} Crore `;
+  if (lakh) result += `${threeDigits(lakh)} Lakh `;
+  if (thousand) result += `${threeDigits(thousand)} Thousand `;
+  if (rest) result += threeDigits(rest);
+  return result.trim();
+}
 
 const LOGO_URL = "/assets/uploads/logo-1.png";
 
@@ -267,23 +354,27 @@ function calcSalaryComponents(emp: StoredEmployee) {
   const gross = basic + da + hra + ta;
   const pf = Math.round(basic * 0.12);
   const esic = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
-  // PT Maharashtra slab
+  // Professional Tax: based on annual gross salary
+  const annualGross = gross * 12;
   let pt = 0;
-  if (gross > 20000) pt = 200;
-  else if (gross > 15000) pt = 150;
-  else if (gross > 10000) pt = 100;
-  // IT new regime (annual)
-  const annualTaxable = gross * 12;
+  if (annualGross >= 400000) pt = 208;
+  else if (annualGross >= 300000) pt = 167;
+  else if (annualGross >= 225000) pt = 125;
+  // Income Tax: new regime slabs
+  const annualTaxable = annualGross;
   let annualIT = 0;
-  if (annualTaxable > 1500000)
-    annualIT = (annualTaxable - 1500000) * 0.3 + 150000;
+  if (annualTaxable > 2400000)
+    annualIT = (annualTaxable - 2400000) * 0.3 + 300000;
+  else if (annualTaxable > 2000000)
+    annualIT = (annualTaxable - 2000000) * 0.25 + 200000;
+  else if (annualTaxable > 1600000)
+    annualIT = (annualTaxable - 1600000) * 0.2 + 120000;
   else if (annualTaxable > 1200000)
-    annualIT = (annualTaxable - 1200000) * 0.2 + 90000;
-  else if (annualTaxable > 900000)
-    annualIT = (annualTaxable - 900000) * 0.15 + 45000;
-  else if (annualTaxable > 600000)
-    annualIT = (annualTaxable - 600000) * 0.1 + 15000;
-  else if (annualTaxable > 300000) annualIT = (annualTaxable - 300000) * 0.05;
+    annualIT = (annualTaxable - 1200000) * 0.15 + 60000;
+  else if (annualTaxable > 800000)
+    annualIT = (annualTaxable - 800000) * 0.1 + 20000;
+  else if (annualTaxable > 400000) annualIT = (annualTaxable - 400000) * 0.05;
+  if (annualTaxable <= 700000 && annualIT <= 25000) annualIT = 0;
   const it = Math.round(annualIT / 12);
   const net = gross - pf - esic - pt - it;
   return { basic, da, hra, ta, gross, pf, esic, pt, it, net };
@@ -469,26 +560,35 @@ export default function ReportsPage() {
       const ptRows = salaryRows
         .map((r) => {
           const g = r.gross || 0;
+          const ag = g * 12;
           const slab =
-            g > 20000
-              ? "Above ₹20,000"
-              : g > 15000
-                ? "₹15,001 – ₹20,000"
-                : g > 10000
-                  ? "₹10,001 – ₹15,000"
-                  : "Up to ₹10,000";
+            ag >= 400000
+              ? "₹4,00,000 & above (annual)"
+              : ag >= 300000
+                ? "₹3,00,000 – ₹3,99,999 (annual)"
+                : ag >= 225000
+                  ? "₹2,25,000 – ₹2,99,999 (annual)"
+                  : "Below ₹2,25,000 (annual)";
           return `<tr><td>${r.emp.name}</td><td>${r.emp.employeeId}</td><td>₹${fmt(g)}</td><td>${slab}</td><td>₹${fmt(r.pt || 0)}</td></tr>`;
         })
         .join("");
       tableHTML =
         ptRows ||
         `<tr><td colspan="5" style="text-align:center">No data found</td></tr>`;
+    } else if (reportId === "paybill") {
+      // Paybill handled separately below
+      tableHeader = "";
+      tableHTML = "";
     } else {
       tableHeader =
         "<tr><th>Name</th><th>Emp ID</th><th>Designation</th><th>Type</th><th>Basic</th><th>DA</th><th>HRA</th><th>TA</th><th>Gross</th><th>PF</th><th>ESIC</th><th>PT</th><th>IT</th><th>Net Pay</th></tr>";
       tableHTML =
         headerRows ||
         `<tr><td colspan="14" style="text-align:center">No data found</td></tr>`;
+    }
+
+    if (reportId === "paybill") {
+      return buildPaybillHTML(selectedMonth, selectedYear, selectedInstitute);
     }
 
     return `<!DOCTYPE html>
@@ -521,9 +621,351 @@ export default function ReportsPage() {
   <thead>${tableHeader}</thead>
   <tbody>
     ${tableHTML}
-    ${reportId === "paybill" || reportId === "salary-register" ? `<tr class="totals"><td colspan="8" style="text-align:right">TOTALS →</td><td>₹${fmt(totals.gross)}</td><td>₹${fmt(totals.pf)}</td><td>₹${fmt(totals.esic)}</td><td>₹${fmt(totals.pt)}</td><td>₹${fmt(totals.it)}</td><td>₹${fmt(totals.net)}</td></tr>` : ""}
+    ${reportId === "salary-register" ? `<tr class="totals"><td colspan="8" style="text-align:right">TOTALS →</td><td>₹${fmt(totals.gross)}</td><td>₹${fmt(totals.pf)}</td><td>₹${fmt(totals.esic)}</td><td>₹${fmt(totals.pt)}</td><td>₹${fmt(totals.it)}</td><td>₹${fmt(totals.net)}</td></tr>` : ""}
   </tbody>
 </table>
+<div class="footer">
+  Generated on ${new Date().toLocaleDateString("en-IN")} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
+</div>
+</body></html>`;
+  }
+
+  function buildPaybillHTML(
+    month: string,
+    year: string,
+    institute: string,
+  ): string {
+    const orgName =
+      institute === "all"
+        ? "Yf's Platform — Salary Management System"
+        : institute;
+    const monthShort = `${month.substring(0, 3)}-${year.substring(2)}`;
+
+    // Helper: return blank if 0
+    const cell = (n: number) =>
+      n ? n.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "";
+
+    const rows = salaryRows.map((r, idx) => {
+      // Resolve fields — handle both SalaryProcessingPage saved records and calculated fallback
+      const basic = (r as any).basicPay ?? (r as any).basic ?? 0;
+      const da = (r as any).da ?? 0;
+      const hra = (r as any).hra ?? 0;
+      const specialPay = (r as any).specialPay ?? 0;
+      const bonus = (r as any).bonus ?? 0;
+      const daArrears = (r as any).daArrears ?? 0;
+      const conveyance = (r as any).conveyanceAllowance ?? 0;
+      const washing = (r as any).washingAllowance ?? 0;
+      const ltc = (r as any).ltc ?? 0;
+      const festAdv = (r as any).festivalAdvance ?? 0;
+      const incentive = (r as any).incentive ?? 0;
+      const otherEarnings = (r as any).otherEarnings ?? 0;
+      const gross = (r as any).grossEarnings ?? (r as any).gross ?? 0;
+      const houseRent = (r as any).houseRent ?? 0;
+      const electricity = (r as any).electricityCharges ?? 0;
+      const lwf = (r as any).lwf ?? 0;
+      const epf = (r as any).epf ?? (r as any).pf ?? 0;
+      const vpf = (r as any).vpf ?? 0;
+      const lic = (r as any).lic ?? 0;
+      const pTax = (r as any).profTax ?? (r as any).pt ?? 0;
+      const incomeTax = (r as any).incomeTax ?? (r as any).it ?? 0;
+      const festival = (r as any).festival ?? 0;
+      const esi = (r as any).esi ?? (r as any).esic ?? 0;
+      const security = (r as any).security ?? 0;
+      const otherDed = (r as any).otherDeductions ?? 0;
+      const totalDed =
+        (r as any).totalDeductions ??
+        epf +
+          esi +
+          pTax +
+          incomeTax +
+          houseRent +
+          electricity +
+          lwf +
+          vpf +
+          lic +
+          festival +
+          security +
+          otherDed;
+      const net = (r as any).netEarnings ?? (r as any).net ?? 0;
+
+      return `<tr>
+        <td class="tc">${idx + 1}</td>
+        <td class="tc">${r.emp.employeeId}</td>
+        <td class="name-cell"><span class="emp-name">${r.emp.name}</span><br/><span class="emp-desig">${r.emp.designation || ""}</span></td>
+        <td class="num">${cell(basic)}</td><td class="num">${cell(specialPay)}</td>
+        <td class="num">${cell(da)}</td><td class="num">${cell(hra)}</td>
+        <td class="num">${cell(bonus)}</td><td class="num">${cell(daArrears)}</td>
+        <td class="num">${cell(conveyance)}</td><td class="num">${cell(washing)}</td>
+        <td class="num">${cell(ltc)}</td><td class="num">${cell(festAdv)}</td>
+        <td class="num">${cell(incentive)}</td><td class="num">${cell(otherEarnings)}</td>
+        <td class="num gross-col">${cell(gross)}</td>
+        <td class="num">${cell(houseRent)}</td><td class="num">${cell(electricity)}</td>
+        <td class="num">${cell(lwf)}</td><td class="num">${cell(epf)}</td>
+        <td class="num">${cell(vpf)}</td><td class="num">${cell(lic)}</td>
+        <td class="num">${cell(pTax)}</td><td class="num">${cell(incomeTax)}</td>
+        <td class="num">${cell(festival)}</td><td class="num">${cell(esi)}</td>
+        <td class="num">${cell(security)}</td><td class="num">${cell(otherDed)}</td>
+        <td class="num totalded-col">${cell(totalDed)}</td>
+        <td class="num net-col"><strong>${cell(net)}</strong></td>
+      </tr>`;
+    });
+
+    // Totals
+    const T = salaryRows.reduce(
+      (acc, r) => {
+        const basic = (r as any).basicPay ?? (r as any).basic ?? 0;
+        const specialPay = (r as any).specialPay ?? 0;
+        const da = (r as any).da ?? 0;
+        const hra = (r as any).hra ?? 0;
+        const bonus = (r as any).bonus ?? 0;
+        const daArrears = (r as any).daArrears ?? 0;
+        const conveyance = (r as any).conveyanceAllowance ?? 0;
+        const washing = (r as any).washingAllowance ?? 0;
+        const ltc = (r as any).ltc ?? 0;
+        const festAdv = (r as any).festivalAdvance ?? 0;
+        const incentive = (r as any).incentive ?? 0;
+        const otherEarnings = (r as any).otherEarnings ?? 0;
+        const gross = (r as any).grossEarnings ?? (r as any).gross ?? 0;
+        const houseRent = (r as any).houseRent ?? 0;
+        const electricity = (r as any).electricityCharges ?? 0;
+        const lwf = (r as any).lwf ?? 0;
+        const epf = (r as any).epf ?? (r as any).pf ?? 0;
+        const vpf = (r as any).vpf ?? 0;
+        const lic = (r as any).lic ?? 0;
+        const pTax = (r as any).profTax ?? (r as any).pt ?? 0;
+        const incomeTax = (r as any).incomeTax ?? (r as any).it ?? 0;
+        const festival = (r as any).festival ?? 0;
+        const esi = (r as any).esi ?? (r as any).esic ?? 0;
+        const security = (r as any).security ?? 0;
+        const otherDed = (r as any).otherDeductions ?? 0;
+        const totalDed =
+          (r as any).totalDeductions ??
+          epf +
+            esi +
+            pTax +
+            incomeTax +
+            houseRent +
+            electricity +
+            lwf +
+            vpf +
+            lic +
+            festival +
+            security +
+            otherDed;
+        const net = (r as any).netEarnings ?? (r as any).net ?? 0;
+        return {
+          basic: acc.basic + basic,
+          specialPay: acc.specialPay + specialPay,
+          da: acc.da + da,
+          hra: acc.hra + hra,
+          bonus: acc.bonus + bonus,
+          daArrears: acc.daArrears + daArrears,
+          conveyance: acc.conveyance + conveyance,
+          washing: acc.washing + washing,
+          ltc: acc.ltc + ltc,
+          festAdv: acc.festAdv + festAdv,
+          incentive: acc.incentive + incentive,
+          otherEarnings: acc.otherEarnings + otherEarnings,
+          gross: acc.gross + gross,
+          houseRent: acc.houseRent + houseRent,
+          electricity: acc.electricity + electricity,
+          lwf: acc.lwf + lwf,
+          epf: acc.epf + epf,
+          vpf: acc.vpf + vpf,
+          lic: acc.lic + lic,
+          pTax: acc.pTax + pTax,
+          incomeTax: acc.incomeTax + incomeTax,
+          festival: acc.festival + festival,
+          esi: acc.esi + esi,
+          security: acc.security + security,
+          otherDed: acc.otherDed + otherDed,
+          totalDed: acc.totalDed + totalDed,
+          net: acc.net + net,
+        };
+      },
+      {
+        basic: 0,
+        specialPay: 0,
+        da: 0,
+        hra: 0,
+        bonus: 0,
+        daArrears: 0,
+        conveyance: 0,
+        washing: 0,
+        ltc: 0,
+        festAdv: 0,
+        incentive: 0,
+        otherEarnings: 0,
+        gross: 0,
+        houseRent: 0,
+        electricity: 0,
+        lwf: 0,
+        epf: 0,
+        vpf: 0,
+        lic: 0,
+        pTax: 0,
+        incomeTax: 0,
+        festival: 0,
+        esi: 0,
+        security: 0,
+        otherDed: 0,
+        totalDed: 0,
+        net: 0,
+      },
+    );
+
+    const totalEarnings = T.gross;
+
+    const sumRow = `<tr class="totals-row">
+      <td colspan="3" class="total-label">TOTAL</td>
+      <td class="num">${cell(T.basic)}</td><td class="num">${cell(T.specialPay)}</td>
+      <td class="num">${cell(T.da)}</td><td class="num">${cell(T.hra)}</td>
+      <td class="num">${cell(T.bonus)}</td><td class="num">${cell(T.daArrears)}</td>
+      <td class="num">${cell(T.conveyance)}</td><td class="num">${cell(T.washing)}</td>
+      <td class="num">${cell(T.ltc)}</td><td class="num">${cell(T.festAdv)}</td>
+      <td class="num">${cell(T.incentive)}</td><td class="num">${cell(T.otherEarnings)}</td>
+      <td class="num gross-col">${cell(T.gross)}</td>
+      <td class="num">${cell(T.houseRent)}</td><td class="num">${cell(T.electricity)}</td>
+      <td class="num">${cell(T.lwf)}</td><td class="num">${cell(T.epf)}</td>
+      <td class="num">${cell(T.vpf)}</td><td class="num">${cell(T.lic)}</td>
+      <td class="num">${cell(T.pTax)}</td><td class="num">${cell(T.incomeTax)}</td>
+      <td class="num">${cell(T.festival)}</td><td class="num">${cell(T.esi)}</td>
+      <td class="num">${cell(T.security)}</td><td class="num">${cell(T.otherDed)}</td>
+      <td class="num totalded-col">${cell(T.totalDed)}</td>
+      <td class="num net-col"><strong>${cell(T.net)}</strong></td>
+    </tr>`;
+
+    const summaryRows = [
+      ["Basic Pay", T.basic, "House Rent", T.houseRent],
+      ["Special Pay", T.specialPay, "Electricity Charge", T.electricity],
+      ["D.A.", T.da, "Labour Welfare Fund", T.lwf],
+      ["H.R.A.", T.hra, "E.P.F.", T.epf],
+      ["Bonus", T.bonus, "V.P.F.", T.vpf],
+      ["D.A. Arrears", T.daArrears, "L.I.C.", T.lic],
+      ["Conveyance Allowance", T.conveyance, "P. Tax", T.pTax],
+      ["Washing Allowance", T.washing, "Income Tax", T.incomeTax],
+      ["LTC Adv./Claim", T.ltc, "Festival Advance", T.festival],
+      ["Festival Advance", T.festAdv, "ESI", T.esi],
+      ["Incentive", T.incentive, "Security Deposit", T.security],
+      ["Other Earnings", T.otherEarnings, "Other Deductions", T.otherDed],
+    ]
+      .map(
+        ([elabel, eamt, dlabel, damt]) =>
+          `<tr><td>${elabel}</td><td class="num">${(eamt as number) ? fmt(eamt as number) : ""}</td><td>${dlabel}</td><td class="num">${(damt as number) ? fmt(damt as number) : ""}</td></tr>`,
+      )
+      .join("");
+
+    return `<!DOCTYPE html>
+<html><head><title>Paybill - ${monthShort}</title>
+<style>
+  @page { size: landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; margin: 0; font-size: 9px; color: #222; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-35deg); opacity: 0.05; z-index: 0; pointer-events: none; }
+  .watermark img { width: 380px; }
+  .page-header { text-align: center; margin-bottom: 8px; }
+  .org-name { font-size: 14px; font-weight: bold; color: #1a365d; }
+  .pay-title { font-size: 11px; color: #2d3748; margin: 2px 0; }
+  .bill-no { position: absolute; top: 10mm; right: 10mm; font-size: 9px; border: 1px solid #aaa; padding: 3px 8px; }
+  table.main-table { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+  table.main-table th { background: #1a365d; color: #fff; text-align: center; padding: 3px 2px; border: 1px solid #2c5282; font-size: 8px; }
+  table.main-table td { padding: 2px 3px; border: 1px solid #cbd5e0; vertical-align: middle; }
+  table.main-table tr:nth-child(even) td { background: #f0f4f8; }
+  .group-earn { background: #2b6cb0 !important; }
+  .group-ded { background: #276749 !important; }
+  .tc { text-align: center; }
+  .num { text-align: right; white-space: nowrap; }
+  .name-cell { min-width: 90px; }
+  .emp-name { font-weight: 600; font-size: 8.5px; }
+  .emp-desig { font-size: 7.5px; color: #555; }
+  .gross-col { background: #bee3f8 !important; font-weight: bold; }
+  .totalded-col { background: #c6f6d5 !important; font-weight: bold; }
+  .net-col { background: #fefcbf !important; font-weight: bold; }
+  .totals-row td { font-weight: bold; background: #ebf8ff !important; border-top: 2px solid #2c5282; }
+  .total-label { text-align: right; font-weight: bold; }
+  table.summary-table { width: 60%; margin: 12px auto; border-collapse: collapse; font-size: 9px; }
+  table.summary-table th { background: #1a365d; color: #fff; padding: 4px 8px; border: 1px solid #2c5282; }
+  table.summary-table td { padding: 3px 8px; border: 1px solid #cbd5e0; }
+  table.summary-table tr:nth-child(even) td { background: #f7fafc; }
+  .summary-total td { font-weight: bold; background: #ebf8ff !important; border-top: 2px solid #2c5282; }
+  .grand-total td { font-weight: bold; background: #fefcbf !important; text-align: center; font-size: 10px; }
+  .payment-line { margin: 12px 0 8px; font-size: 10px; border: 1px solid #aaa; padding: 6px 10px; border-radius: 4px; }
+  .sig-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+  .sig-table td { text-align: center; padding-top: 30px; border-top: 1px solid #555; width: 25%; font-size: 9px; font-weight: 600; color: #2d3748; }
+  .footer { margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 5px; font-size: 8px; color: #718096; text-align: center; }
+  @media print { body { margin: 0; } .no-print { display: none; } }
+</style>
+</head><body>
+<div class="watermark"><img src="${LOGO_URL}" alt="" /></div>
+<div class="bill-no">Pay Bill No: …………………</div>
+<div class="page-header">
+  <div class="org-name">${orgName}</div>
+  <div class="pay-title">Pay Bill for the month of: ${monthShort}</div>
+  <div style="font-size:9px;color:#555">${institute === "all" ? "All Institutes" : institute}</div>
+</div>
+
+<table class="main-table">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:22px">Sl<br/>No</th>
+      <th rowspan="2" style="width:40px">Staff<br/>No</th>
+      <th rowspan="2" style="width:90px">Name / Designation</th>
+      <th colspan="13" class="group-earn">EARNINGS</th>
+      <th colspan="13" class="group-ded">DEDUCTIONS</th>
+      <th rowspan="2" class="net-col" style="width:55px">Net<br/>Salary</th>
+    </tr>
+    <tr>
+      <th>Basic<br/>Pay</th><th>Special<br/>Pay</th>
+      <th>D. A.</th><th>H R A</th>
+      <th>Bonus</th><th>D.A.<br/>Arrears</th>
+      <th>Conveyance<br/>Allow.</th><th>Washing<br/>Allow.</th>
+      <th>LTC<br/>Adv./Claim</th><th>Festival<br/>Advance</th>
+      <th>Incentive</th><th>Other<br/>Earnings</th>
+      <th class="gross-col">Gross</th>
+      <th>House<br/>Rent</th><th>Electricity<br/>Charge</th>
+      <th>LWF</th><th>E.P.F.</th>
+      <th>V.P.F.</th><th>L.I.C.</th>
+      <th>P. Tax</th><th>Income<br/>Tax</th>
+      <th>Festival<br/>Advance</th><th>ESI</th>
+      <th>Security<br/>Deposit</th><th>Other<br/>Ded.</th>
+      <th class="totalded-col">Total<br/>Deductions</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows.length ? rows.join("") : `<tr><td colspan="30" style="text-align:center;padding:12px">No employee data found for ${monthShort}</td></tr>`}
+    ${sumRow}
+  </tbody>
+</table>
+
+<table class="summary-table">
+  <thead>
+    <tr><th>EARNINGS</th><th>AMOUNT</th><th>DEDUCTIONS</th><th>AMOUNT</th></tr>
+  </thead>
+  <tbody>
+    ${summaryRows}
+    <tr class="summary-total">
+      <td>Total Earnings</td><td class="num">${fmt(totalEarnings)}</td>
+      <td>Total Deductions</td><td class="num">${fmt(T.totalDed)}</td>
+    </tr>
+    <tr class="grand-total">
+      <td colspan="2">Gross Salary: ₹${fmt(totalEarnings)}</td>
+      <td colspan="2">Net Salary: ₹${fmt(T.net)}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="payment-line">
+  Payment passed for <strong>Rs. ${fmt(T.net)}/-</strong> (Rupees <strong>${numberToWords(Math.round(T.net))}</strong> Only)
+</div>
+
+<table class="sig-table">
+  <tr>
+    <td>Account Assistant</td>
+    <td>Section Officer</td>
+    <td>Secretary</td>
+    <td>Treasurer</td>
+  </tr>
+</table>
+
 <div class="footer">
   Generated on ${new Date().toLocaleDateString("en-IN")} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
 </div>
@@ -640,7 +1082,7 @@ export default function ReportsPage() {
             <TabsTrigger
               key={cat.id}
               value={cat.id}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md"
             >
               {cat.icon} {cat.label}
             </TabsTrigger>

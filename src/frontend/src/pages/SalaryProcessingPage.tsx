@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Copy,
   Info,
   Lock,
   Trash2,
@@ -142,6 +143,18 @@ type SalaryInputs = {
 
 function defaultInputs(emp: Employee): SalaryInputs {
   const isRegular = emp.employmentType === "regular";
+  const empTA = (() => {
+    try {
+      return (
+        Number(
+          JSON.parse(localStorage.getItem(`empExtra_${emp.employeeId}`) || "{}")
+            .ta,
+        ) || 0
+      );
+    } catch {
+      return 0;
+    }
+  })();
   return {
     lwp: 0,
     specialPay: 0,
@@ -149,7 +162,7 @@ function defaultInputs(emp: Employee): SalaryInputs {
     hraPercent: isRegular ? 20 : 0,
     bonus: 0,
     daArrears: 0,
-    ta: isRegular ? 1500 : 0,
+    ta: isRegular ? empTA : 0,
     conveyanceAllowance: 0,
     washingAllowance: 0,
     ltc: 0,
@@ -202,23 +215,29 @@ function calcSalary(
   const epf = Math.round(adjustedBasic * 0.12);
   const esi = grossEarnings <= 21000 ? Math.round(grossEarnings * 0.0075) : 0;
 
+  // Professional Tax: based on annual gross salary
+  const annualGross = grossEarnings * 12;
   let profTax = 0;
-  if (grossEarnings > 20000) profTax = 200;
-  else if (grossEarnings > 15000) profTax = 150;
-  else if (grossEarnings > 10000) profTax = 100;
+  if (annualGross >= 400000) profTax = 208;
+  else if (annualGross >= 300000) profTax = 167;
+  else if (annualGross >= 225000) profTax = 125;
 
+  // Income Tax: new tax regime slabs on annual taxable income
   const annualTaxable = Math.max(0, grossEarnings * 12 - 75000);
   let annualIT = 0;
-  if (annualTaxable > 1500000)
-    annualIT = (annualTaxable - 1500000) * 0.3 + 150000;
+  if (annualTaxable > 2400000)
+    annualIT = (annualTaxable - 2400000) * 0.3 + 300000;
+  else if (annualTaxable > 2000000)
+    annualIT = (annualTaxable - 2000000) * 0.25 + 200000;
+  else if (annualTaxable > 1600000)
+    annualIT = (annualTaxable - 1600000) * 0.2 + 120000;
   else if (annualTaxable > 1200000)
-    annualIT = (annualTaxable - 1200000) * 0.2 + 90000;
-  else if (annualTaxable > 900000)
-    annualIT = (annualTaxable - 900000) * 0.15 + 45000;
-  else if (annualTaxable > 600000)
-    annualIT = (annualTaxable - 600000) * 0.1 + 15000;
-  else if (annualTaxable > 300000) annualIT = (annualTaxable - 300000) * 0.05;
-  if (annualTaxable <= 700000) annualIT = 0;
+    annualIT = (annualTaxable - 1200000) * 0.15 + 60000;
+  else if (annualTaxable > 800000)
+    annualIT = (annualTaxable - 800000) * 0.1 + 20000;
+  else if (annualTaxable > 400000) annualIT = (annualTaxable - 400000) * 0.05;
+  // Section 87A rebate: no tax if income <= 7L and tax <= 25000
+  if (annualTaxable <= 700000 && annualIT <= 25000) annualIT = 0;
   const incomeTax = Math.round(annualIT / 12);
 
   const totalDeductions =
@@ -382,6 +401,25 @@ export default function SalaryProcessingPage() {
     (e) => selectedInstitute === "all" || e.institute === selectedInstitute,
   );
 
+  const prevMonthIdx =
+    MONTHS.indexOf(selectedMonth) === 0
+      ? 11
+      : MONTHS.indexOf(selectedMonth) - 1;
+  const prevMonthYear =
+    MONTHS.indexOf(selectedMonth) === 0
+      ? String(Number(selectedYear) - 1)
+      : selectedYear;
+  const prevMonth = MONTHS[prevMonthIdx];
+
+  function getPrevMonthSalary(empId: string) {
+    return salaries.find(
+      (s: SalaryRecord) =>
+        s.employeeId === empId &&
+        s.month === prevMonth &&
+        s.year === prevMonthYear,
+    );
+  }
+
   function isAttendanceSaved(empId: string) {
     return attendance.some(
       (a: { employeeId: string; month: string; year: string }) =>
@@ -474,9 +512,6 @@ export default function SalaryProcessingPage() {
             <h1 className="text-xl font-display font-bold">
               Salary Processing
             </h1>
-            <p className="text-sm text-muted-foreground">
-              DA=257% | HRA=20% | PF=12% | ESIC=0.75% (regular employees)
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -543,7 +578,7 @@ export default function SalaryProcessingPage() {
       )}
 
       {filteredEmployees.length === 0 ? (
-        <div className="text-center py-20">
+        <div className="text-center py-20" data-ocid="salary.empty_state">
           <Users className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-lg font-display font-semibold text-muted-foreground">
             No employees found
@@ -661,14 +696,77 @@ export default function SalaryProcessingPage() {
                           Est. Net: <strong>{fmt(preview.netEarnings)}</strong>
                         </span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => setExpandedEmp(emp.employeeId)}
-                      >
-                        <ChevronDown className="w-3 h-3" /> Process
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const prevSal = getPrevMonthSalary(emp.employeeId);
+                          const hasCurrent = !!getSavedSalary(emp.employeeId);
+                          if (attSaved && prevSal && !hasCurrent) {
+                            return (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => {
+                                  setSalaryInputs((prev) => ({
+                                    ...prev,
+                                    [emp.employeeId]: {
+                                      lwp: 0,
+                                      specialPay: prevSal.specialPay ?? 0,
+                                      daPercent:
+                                        prevSal.daPercent ??
+                                        (emp.employmentType === "regular"
+                                          ? 257
+                                          : 0),
+                                      hraPercent:
+                                        prevSal.hraPercent ??
+                                        (emp.employmentType === "regular"
+                                          ? 20
+                                          : 0),
+                                      bonus: prevSal.bonus ?? 0,
+                                      daArrears: prevSal.daArrears ?? 0,
+                                      ta: prevSal.ta ?? 0,
+                                      conveyanceAllowance:
+                                        prevSal.conveyanceAllowance ?? 0,
+                                      washingAllowance:
+                                        prevSal.washingAllowance ?? 0,
+                                      ltc: prevSal.ltc ?? 0,
+                                      festivalAdvance:
+                                        prevSal.festivalAdvance ?? 0,
+                                      incentive: prevSal.incentive ?? 0,
+                                      otherEarnings: prevSal.otherEarnings ?? 0,
+                                      houseRent: prevSal.houseRent ?? 0,
+                                      electricityCharges:
+                                        prevSal.electricityCharges ?? 0,
+                                      lwf: prevSal.lwf ?? 0,
+                                      vpf: prevSal.vpf ?? 0,
+                                      lic: prevSal.lic ?? 0,
+                                      festival: prevSal.festival ?? 0,
+                                      security: prevSal.security ?? 0,
+                                      otherDeductions:
+                                        prevSal.otherDeductions ?? 0,
+                                    },
+                                  }));
+                                  setExpandedEmp(emp.employeeId);
+                                  toast.success(
+                                    "Previous month salary loaded. You can edit before saving.",
+                                  );
+                                }}
+                              >
+                                <Copy className="w-3 h-3" /> Load Prev Month
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setExpandedEmp(emp.employeeId)}
+                        >
+                          <ChevronDown className="w-3 h-3" /> Process
+                        </Button>
+                      </div>
                     </div>
                   )}
 
@@ -679,14 +777,76 @@ export default function SalaryProcessingPage() {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           Salary Details
                         </p>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-xs gap-1"
-                          onClick={() => setExpandedEmp(null)}
-                        >
-                          <ChevronUp className="w-3 h-3" /> Collapse
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const prevSal = getPrevMonthSalary(emp.employeeId);
+                            if (prevSal && !isPast) {
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1"
+                                  onClick={() => {
+                                    setSalaryInputs((prev) => ({
+                                      ...prev,
+                                      [emp.employeeId]: {
+                                        lwp: 0,
+                                        specialPay: prevSal.specialPay ?? 0,
+                                        daPercent:
+                                          prevSal.daPercent ??
+                                          (emp.employmentType === "regular"
+                                            ? 257
+                                            : 0),
+                                        hraPercent:
+                                          prevSal.hraPercent ??
+                                          (emp.employmentType === "regular"
+                                            ? 20
+                                            : 0),
+                                        bonus: prevSal.bonus ?? 0,
+                                        daArrears: prevSal.daArrears ?? 0,
+                                        ta: prevSal.ta ?? 0,
+                                        conveyanceAllowance:
+                                          prevSal.conveyanceAllowance ?? 0,
+                                        washingAllowance:
+                                          prevSal.washingAllowance ?? 0,
+                                        ltc: prevSal.ltc ?? 0,
+                                        festivalAdvance:
+                                          prevSal.festivalAdvance ?? 0,
+                                        incentive: prevSal.incentive ?? 0,
+                                        otherEarnings:
+                                          prevSal.otherEarnings ?? 0,
+                                        houseRent: prevSal.houseRent ?? 0,
+                                        electricityCharges:
+                                          prevSal.electricityCharges ?? 0,
+                                        lwf: prevSal.lwf ?? 0,
+                                        vpf: prevSal.vpf ?? 0,
+                                        lic: prevSal.lic ?? 0,
+                                        festival: prevSal.festival ?? 0,
+                                        security: prevSal.security ?? 0,
+                                        otherDeductions:
+                                          prevSal.otherDeductions ?? 0,
+                                      },
+                                    }));
+                                    toast.success(
+                                      "Previous month salary loaded. You can edit before saving.",
+                                    );
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3" /> Load Prev Month
+                                </Button>
+                              );
+                            }
+                            return null;
+                          })()}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-xs gap-1"
+                            onClick={() => setExpandedEmp(null)}
+                          >
+                            <ChevronUp className="w-3 h-3" /> Collapse
+                          </Button>
+                        </div>
                       </div>
 
                       {/* EARNINGS */}

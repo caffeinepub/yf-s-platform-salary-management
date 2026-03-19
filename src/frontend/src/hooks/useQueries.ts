@@ -1,39 +1,241 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  AttendanceRecord,
-  DailyWorker,
-  Employee,
-  Institute,
-  SalaryRecord,
-} from "../backend.d";
 import { Designation, EmploymentType } from "../backend.d";
-import { useActor } from "./useActor";
+import type {
+  LocalAttendanceRecord,
+  LocalDailyWorker,
+  LocalEmployee,
+  LocalInstitute,
+  LocalSalaryRecord,
+} from "./localStore";
+import {
+  localAddDailyWorker,
+  localAddEmployee,
+  localAddInstitute,
+  localDeleteDailyWorker,
+  localDeleteEmployee,
+  localDeleteInstitute,
+  localGetAllDailyWorkers,
+  localGetAllEmployees,
+  localGetAllInstitutes,
+  localGetAttendance,
+  localGetAttendanceForInstitute,
+  localGetDailyWorkersForInstitute,
+  localGetEmployeesForInstitute,
+  localGetSalariesForInstitute,
+  localGetSalary,
+  localLockAttendance,
+  localLockSalary,
+  localProcessSalary,
+  localSaveAttendance,
+  localUpdateDailyWorker,
+  localUpdateEmployee,
+  localUpdateInstitute,
+} from "./localStore";
 
-export type {
-  Institute,
-  Employee,
-  AttendanceRecord,
-  SalaryRecord,
-  DailyWorker,
-};
 export { Designation, EmploymentType };
 
-// ─── Institutes ───────────────────────────────────────────────
+// ─── Type adapters (localStorage numbers ↔ bigint for page compat) ────────────
+
+export interface Institute {
+  id: bigint;
+  name: string;
+  code: string;
+  location: string;
+}
+
+export interface Employee {
+  id: bigint;
+  name: string;
+  employeeId: string;
+  instituteId: bigint;
+  designation: string;
+  employmentType: string;
+  joiningDate: string;
+  address: string;
+  dob: string;
+  basicSalary: bigint;
+  department?: string;
+  bhelQuarter?: string;
+  profilePic?: string;
+  religion?: string;
+  gender?: string;
+  category?: string;
+  employeeStatus?: string;
+  phone?: string;
+  emailId?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankAccountNo?: string;
+  ifscCode?: string;
+  panNo?: string;
+  pfNumber?: string;
+  esiNumber?: string;
+  aadhaarNo?: string;
+  uanNo?: string;
+  licNo?: string;
+}
+
+export interface AttendanceRecord {
+  employeeId: bigint;
+  month: bigint;
+  year: bigint;
+  days: string[];
+  totalPresent: bigint;
+  totalAbsent: bigint;
+  isLocked: boolean;
+}
+
+export interface SalaryRecord {
+  employeeId: bigint;
+  month: bigint;
+  year: bigint;
+  basicSalary: bigint;
+  da: bigint;
+  hra: bigint;
+  grossSalary: bigint;
+  pf: bigint;
+  esic: bigint;
+  pt: bigint;
+  totalDeductions: bigint;
+  netSalary: bigint;
+  isLocked: boolean;
+  // Extended fields
+  specialPay?: bigint;
+  lwp?: bigint;
+  daPercent?: bigint;
+  hraPercent?: bigint;
+  ta?: bigint;
+  conveyanceAllowance?: bigint;
+  washingAllowance?: bigint;
+  ltc?: bigint;
+  festivalAdvance?: bigint;
+  incentive?: bigint;
+  bonus?: bigint;
+  daArrears?: bigint;
+  otherEarnings?: bigint;
+  grossEarnings?: bigint;
+  houseRent?: bigint;
+  electricityCharges?: bigint;
+  lwf?: bigint;
+  epf?: bigint;
+  vpf?: bigint;
+  lic?: bigint;
+  profTax?: bigint;
+  incomeTax?: bigint;
+  festival?: bigint;
+  esi?: bigint;
+  security?: bigint;
+  otherDeductions?: bigint;
+  totalDeductionsFull?: bigint;
+  netEarnings?: bigint;
+}
+
+export interface DailyWorker {
+  id: bigint;
+  name: string;
+  ratePerDay: bigint;
+  periodFrom: string;
+  periodTo: string;
+  attendanceDays: bigint;
+  totalPayable: bigint;
+  instituteId: bigint;
+  status?: string;
+}
+
+// ─── Conversion helpers ───────────────────────────────────────────────────────
+
+function toInstitute(i: LocalInstitute): Institute {
+  return { ...i, id: BigInt(i.id) };
+}
+
+function toEmployee(e: LocalEmployee): Employee {
+  return {
+    ...e,
+    id: BigInt(e.id),
+    instituteId: BigInt(e.instituteId),
+    basicSalary: BigInt(e.basicSalary),
+  };
+}
+
+function toAttendance(a: LocalAttendanceRecord): AttendanceRecord {
+  return {
+    ...a,
+    employeeId: BigInt(a.employeeId),
+    month: BigInt(a.month),
+    year: BigInt(a.year),
+    totalPresent: BigInt(a.totalPresent),
+    totalAbsent: BigInt(a.totalAbsent),
+  };
+}
+
+function toSalary(s: LocalSalaryRecord): SalaryRecord {
+  return {
+    employeeId: BigInt(s.employeeId),
+    month: BigInt(s.month),
+    year: BigInt(s.year),
+    basicSalary: BigInt(s.basicSalary),
+    da: BigInt(s.da),
+    hra: BigInt(s.hra),
+    grossSalary: BigInt(s.grossSalary),
+    pf: BigInt(s.pf),
+    esic: BigInt(s.esic),
+    pt: BigInt(s.pt),
+    totalDeductions: BigInt(s.totalDeductions),
+    netSalary: BigInt(s.netSalary),
+    isLocked: s.isLocked,
+    specialPay: BigInt(s.specialPay),
+    lwp: BigInt(s.lwp),
+    daPercent: BigInt(s.daPercent),
+    hraPercent: BigInt(s.hraPercent),
+    ta: BigInt(s.ta),
+    conveyanceAllowance: BigInt(s.conveyanceAllowance),
+    washingAllowance: BigInt(s.washingAllowance),
+    ltc: BigInt(s.ltc),
+    festivalAdvance: BigInt(s.festivalAdvance),
+    incentive: BigInt(s.incentive),
+    bonus: BigInt(s.bonus),
+    daArrears: BigInt(s.daArrears),
+    otherEarnings: BigInt(s.otherEarnings),
+    grossEarnings: BigInt(s.grossEarnings),
+    houseRent: BigInt(s.houseRent),
+    electricityCharges: BigInt(s.electricityCharges),
+    lwf: BigInt(s.lwf),
+    epf: BigInt(s.epf),
+    vpf: BigInt(s.vpf),
+    lic: BigInt(s.lic),
+    profTax: BigInt(s.profTax),
+    incomeTax: BigInt(s.incomeTax),
+    festival: BigInt(s.festival),
+    esi: BigInt(s.esi),
+    security: BigInt(s.security),
+    otherDeductions: BigInt(s.otherDeductions),
+    totalDeductionsFull: BigInt(s.totalDeductions),
+    netEarnings: BigInt(s.netEarnings),
+  };
+}
+
+function toDailyWorker(w: LocalDailyWorker): DailyWorker {
+  return {
+    ...w,
+    id: BigInt(w.id),
+    ratePerDay: BigInt(w.ratePerDay),
+    attendanceDays: BigInt(w.attendanceDays),
+    totalPayable: BigInt(w.totalPayable),
+    instituteId: BigInt(w.instituteId),
+  };
+}
+
+// ─── Institutes ───────────────────────────────────────────────────────────────
 
 export function useGetAllInstitutes() {
-  const { actor, isFetching } = useActor();
   return useQuery<Institute[]>({
     queryKey: ["institutes"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllInstitutes();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localGetAllInstitutes().map(toInstitute),
+    staleTime: 0,
   });
 }
 
 export function useAddInstitute() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -41,15 +243,13 @@ export function useAddInstitute() {
       code,
       location,
     }: { name: string; code: string; location: string }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.addInstitute(name, code, location);
+      return localAddInstitute(name, code, location);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["institutes"] }),
   });
 }
 
 export function useUpdateInstitute() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -58,20 +258,17 @@ export function useUpdateInstitute() {
       code,
       location,
     }: { id: bigint; name: string; code: string; location: string }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.updateInstitute(id, name, code, location);
+      localUpdateInstitute(Number(id), name, code, location);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["institutes"] }),
   });
 }
 
 export function useDeleteInstitute() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.deleteInstitute(id);
+      localDeleteInstitute(Number(id));
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["institutes"] });
@@ -80,66 +277,97 @@ export function useDeleteInstitute() {
   });
 }
 
-// ─── Employees ────────────────────────────────────────────────
+// ─── Employees ────────────────────────────────────────────────────────────────
 
 export function useGetEmployeesForInstitute(instituteId: bigint | null) {
-  const { actor, isFetching } = useActor();
   return useQuery<Employee[]>({
     queryKey: ["employees", instituteId?.toString()],
-    queryFn: async () => {
-      if (!actor || instituteId === null) return [];
-      return actor.getAllEmployeesForInstitute(instituteId);
+    queryFn: () => {
+      if (instituteId === null) return [];
+      return localGetEmployeesForInstitute(Number(instituteId)).map(toEmployee);
     },
-    enabled: !!actor && !isFetching && instituteId !== null,
+    enabled: instituteId !== null,
+    staleTime: 0,
   });
 }
 
 export function useGetAllEmployees() {
-  const { actor, isFetching } = useActor();
   return useQuery<Employee[]>({
     queryKey: ["employees", "all"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return (actor as any).getAllEmployees();
-    },
-    enabled: !!actor && !isFetching,
+    queryFn: () => localGetAllEmployees().map(toEmployee),
+    staleTime: 0,
   });
 }
 
 export function useAddEmployee() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
       name: string;
       employeeId: string;
       instituteId: bigint;
-      designation: Designation;
-      employmentType: EmploymentType;
+      designation: Designation | string;
+      employmentType: EmploymentType | string;
       joiningDate: string;
       address: string;
       dob: string;
       basicSalary: bigint;
+      department?: string;
+      bhelQuarter?: string;
+      profilePic?: string;
+      religion?: string;
+      gender?: string;
+      category?: string;
+      employeeStatus?: string;
+      phone?: string;
+      emailId?: string;
+      bankName?: string;
+      bankBranch?: string;
+      bankAccountNo?: string;
+      ifscCode?: string;
+      panNo?: string;
+      pfNumber?: string;
+      esiNumber?: string;
+      aadhaarNo?: string;
+      uanNo?: string;
+      licNo?: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.addEmployee(
-        data.name,
-        data.employeeId,
-        data.instituteId,
-        data.designation,
-        data.employmentType,
-        data.joiningDate,
-        data.address,
-        data.dob,
-        data.basicSalary,
-      );
+      return localAddEmployee({
+        name: data.name,
+        employeeId: data.employeeId,
+        instituteId: Number(data.instituteId),
+        designation: String(data.designation),
+        employmentType: String(data.employmentType),
+        joiningDate: data.joiningDate,
+        address: data.address,
+        dob: data.dob,
+        basicSalary: Number(data.basicSalary),
+        department: data.department,
+        bhelQuarter: data.bhelQuarter,
+        profilePic: data.profilePic,
+        religion: data.religion,
+        gender: data.gender,
+        category: data.category,
+        employeeStatus: data.employeeStatus ?? "Active",
+        phone: data.phone,
+        emailId: data.emailId,
+        bankName: data.bankName,
+        bankBranch: data.bankBranch,
+        bankAccountNo: data.bankAccountNo,
+        ifscCode: data.ifscCode,
+        panNo: data.panNo,
+        pfNumber: data.pfNumber,
+        esiNumber: data.esiNumber,
+        aadhaarNo: data.aadhaarNo,
+        uanNo: data.uanNo,
+        licNo: data.licNo,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
   });
 }
 
 export function useUpdateEmployee() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -147,67 +375,98 @@ export function useUpdateEmployee() {
       name: string;
       employeeId: string;
       instituteId: bigint;
-      designation: Designation;
-      employmentType: EmploymentType;
+      designation: Designation | string;
+      employmentType: EmploymentType | string;
       joiningDate: string;
       address: string;
       dob: string;
       basicSalary: bigint;
+      department?: string;
+      bhelQuarter?: string;
+      profilePic?: string;
+      religion?: string;
+      gender?: string;
+      category?: string;
+      employeeStatus?: string;
+      phone?: string;
+      emailId?: string;
+      bankName?: string;
+      bankBranch?: string;
+      bankAccountNo?: string;
+      ifscCode?: string;
+      panNo?: string;
+      pfNumber?: string;
+      esiNumber?: string;
+      aadhaarNo?: string;
+      uanNo?: string;
+      licNo?: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.updateEmployee(
-        data.id,
-        data.name,
-        data.employeeId,
-        data.instituteId,
-        data.designation,
-        data.employmentType,
-        data.joiningDate,
-        data.address,
-        data.dob,
-        data.basicSalary,
-      );
+      localUpdateEmployee(Number(data.id), {
+        name: data.name,
+        employeeId: data.employeeId,
+        instituteId: Number(data.instituteId),
+        designation: String(data.designation),
+        employmentType: String(data.employmentType),
+        joiningDate: data.joiningDate,
+        address: data.address,
+        dob: data.dob,
+        basicSalary: Number(data.basicSalary),
+        department: data.department,
+        bhelQuarter: data.bhelQuarter,
+        profilePic: data.profilePic,
+        religion: data.religion,
+        gender: data.gender,
+        category: data.category,
+        employeeStatus: data.employeeStatus,
+        phone: data.phone,
+        emailId: data.emailId,
+        bankName: data.bankName,
+        bankBranch: data.bankBranch,
+        bankAccountNo: data.bankAccountNo,
+        ifscCode: data.ifscCode,
+        panNo: data.panNo,
+        pfNumber: data.pfNumber,
+        esiNumber: data.esiNumber,
+        aadhaarNo: data.aadhaarNo,
+        uanNo: data.uanNo,
+        licNo: data.licNo,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
   });
 }
 
 export function useDeleteEmployee() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not ready");
-      return actor.deleteEmployee(id);
+      localDeleteEmployee(Number(id));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
   });
 }
 
-// ─── Attendance ───────────────────────────────────────────────
+// ─── Attendance ───────────────────────────────────────────────────────────────
 
 export function useGetAttendance(
   employeeId: bigint | null,
   month: number,
   year: number,
 ) {
-  const { actor, isFetching } = useActor();
   return useQuery<AttendanceRecord | null>({
     queryKey: [
       "attendance",
       employeeId?.toString(),
-      month.toString(),
-      year.toString(),
+      String(month),
+      String(year),
     ],
-    queryFn: async () => {
-      if (!actor || employeeId === null) return null;
-      return (actor as any).getAttendance(
-        employeeId,
-        BigInt(month),
-        BigInt(year),
-      );
+    queryFn: () => {
+      if (employeeId === null) return null;
+      const rec = localGetAttendance(Number(employeeId), month, year);
+      return rec ? toAttendance(rec) : null;
     },
-    enabled: !!actor && !isFetching && employeeId !== null,
+    enabled: employeeId !== null,
+    staleTime: 0,
   });
 }
 
@@ -216,29 +475,28 @@ export function useGetAttendanceForInstitute(
   month: number,
   year: number,
 ) {
-  const { actor, isFetching } = useActor();
   return useQuery<AttendanceRecord[]>({
     queryKey: [
       "attendance",
       "institute",
       instituteId?.toString(),
-      month.toString(),
-      year.toString(),
+      String(month),
+      String(year),
     ],
-    queryFn: async () => {
-      if (!actor || instituteId === null) return [];
-      return (actor as any).getAttendanceForInstitute(
-        instituteId,
-        BigInt(month),
-        BigInt(year),
-      );
+    queryFn: () => {
+      if (instituteId === null) return [];
+      return localGetAttendanceForInstitute(
+        Number(instituteId),
+        month,
+        year,
+      ).map(toAttendance);
     },
-    enabled: !!actor && !isFetching && instituteId !== null,
+    enabled: instituteId !== null,
+    staleTime: 0,
   });
 }
 
 export function useSaveAttendance() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -247,11 +505,10 @@ export function useSaveAttendance() {
       year: number;
       days: string[];
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).saveAttendance(
-        data.employeeId,
-        BigInt(data.month),
-        BigInt(data.year),
+      localSaveAttendance(
+        Number(data.employeeId),
+        data.month,
+        data.year,
         data.days,
       );
     },
@@ -260,7 +517,6 @@ export function useSaveAttendance() {
 }
 
 export function useLockAttendance() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -268,37 +524,28 @@ export function useLockAttendance() {
       month: number;
       year: number;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).lockAttendance(
-        data.employeeId,
-        BigInt(data.month),
-        BigInt(data.year),
-      );
+      localLockAttendance(Number(data.employeeId), data.month, data.year);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance"] }),
   });
 }
 
-// ─── Salary ───────────────────────────────────────────────────
+// ─── Salary ───────────────────────────────────────────────────────────────────
 
 export function useGetSalary(
   employeeId: bigint | null,
   month: number,
   year: number,
 ) {
-  const { actor, isFetching } = useActor();
   return useQuery<SalaryRecord | null>({
-    queryKey: [
-      "salary",
-      employeeId?.toString(),
-      month.toString(),
-      year.toString(),
-    ],
-    queryFn: async () => {
-      if (!actor || employeeId === null) return null;
-      return (actor as any).getSalary(employeeId, BigInt(month), BigInt(year));
+    queryKey: ["salary", employeeId?.toString(), String(month), String(year)],
+    queryFn: () => {
+      if (employeeId === null) return null;
+      const rec = localGetSalary(Number(employeeId), month, year);
+      return rec ? toSalary(rec) : null;
     },
-    enabled: !!actor && !isFetching && employeeId !== null,
+    enabled: employeeId !== null,
+    staleTime: 0,
   });
 }
 
@@ -307,29 +554,26 @@ export function useGetSalariesForInstitute(
   month: number,
   year: number,
 ) {
-  const { actor, isFetching } = useActor();
   return useQuery<SalaryRecord[]>({
     queryKey: [
       "salary",
       "institute",
       instituteId?.toString(),
-      month.toString(),
-      year.toString(),
+      String(month),
+      String(year),
     ],
-    queryFn: async () => {
-      if (!actor || instituteId === null) return [];
-      return (actor as any).getSalariesForInstitute(
-        instituteId,
-        BigInt(month),
-        BigInt(year),
+    queryFn: () => {
+      if (instituteId === null) return [];
+      return localGetSalariesForInstitute(Number(instituteId), month, year).map(
+        toSalary,
       );
     },
-    enabled: !!actor && !isFetching && instituteId !== null,
+    enabled: instituteId !== null,
+    staleTime: 0,
   });
 }
 
 export function useProcessSalary() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -337,19 +581,13 @@ export function useProcessSalary() {
       month: number;
       year: number;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).processSalary(
-        data.employeeId,
-        BigInt(data.month),
-        BigInt(data.year),
-      );
+      return localProcessSalary(Number(data.employeeId), data.month, data.year);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["salary"] }),
   });
 }
 
 export function useLockSalary() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -357,33 +595,29 @@ export function useLockSalary() {
       month: number;
       year: number;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).lockSalary(
-        data.employeeId,
-        BigInt(data.month),
-        BigInt(data.year),
-      );
+      localLockSalary(Number(data.employeeId), data.month, data.year);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["salary"] }),
   });
 }
 
-// ─── Daily Workers ────────────────────────────────────────────
+// ─── Daily Workers ────────────────────────────────────────────────────────────
 
 export function useGetDailyWorkersForInstitute(instituteId: bigint | null) {
-  const { actor, isFetching } = useActor();
   return useQuery<DailyWorker[]>({
     queryKey: ["dailyWorkers", instituteId?.toString()],
-    queryFn: async () => {
-      if (!actor || instituteId === null) return [];
-      return (actor as any).getDailyWorkersForInstitute(instituteId);
+    queryFn: () => {
+      if (instituteId === null)
+        return localGetAllDailyWorkers().map(toDailyWorker);
+      return localGetDailyWorkersForInstitute(Number(instituteId)).map(
+        toDailyWorker,
+      );
     },
-    enabled: !!actor && !isFetching && instituteId !== null,
+    staleTime: 0,
   });
 }
 
 export function useAddDailyWorker() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -393,23 +627,23 @@ export function useAddDailyWorker() {
       periodTo: string;
       attendanceDays: number;
       instituteId: bigint;
+      status?: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).addDailyWorker(
-        data.name,
-        BigInt(data.ratePerDay),
-        data.periodFrom,
-        data.periodTo,
-        BigInt(data.attendanceDays),
-        data.instituteId,
-      );
+      return localAddDailyWorker({
+        name: data.name,
+        ratePerDay: data.ratePerDay,
+        periodFrom: data.periodFrom,
+        periodTo: data.periodTo,
+        attendanceDays: data.attendanceDays,
+        instituteId: Number(data.instituteId),
+        status: data.status ?? "active",
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dailyWorkers"] }),
   });
 }
 
 export function useUpdateDailyWorker() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
@@ -420,29 +654,27 @@ export function useUpdateDailyWorker() {
       periodTo: string;
       attendanceDays: number;
       instituteId: bigint;
+      status?: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).updateDailyWorker(
-        data.id,
-        data.name,
-        BigInt(data.ratePerDay),
-        data.periodFrom,
-        data.periodTo,
-        BigInt(data.attendanceDays),
-        data.instituteId,
-      );
+      localUpdateDailyWorker(Number(data.id), {
+        name: data.name,
+        ratePerDay: data.ratePerDay,
+        periodFrom: data.periodFrom,
+        periodTo: data.periodTo,
+        attendanceDays: data.attendanceDays,
+        instituteId: Number(data.instituteId),
+        status: data.status,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dailyWorkers"] }),
   });
 }
 
 export function useDeleteDailyWorker() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not ready");
-      return (actor as any).deleteDailyWorker(id);
+      localDeleteDailyWorker(Number(id));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dailyWorkers"] }),
   });

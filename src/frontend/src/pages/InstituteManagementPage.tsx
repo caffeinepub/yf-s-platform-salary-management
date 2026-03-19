@@ -84,8 +84,8 @@ export default function InstituteManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.code.trim() || !form.location.trim()) {
-      toast.error("All fields are required");
+    if (!form.name.trim() || !form.location.trim()) {
+      toast.error("Name and location are required");
       return;
     }
     try {
@@ -216,13 +216,15 @@ export default function InstituteManagementPage() {
                         <CardTitle className="text-base font-display">
                           {inst.name}
                         </CardTitle>
-                        <Badge
-                          variant="secondary"
-                          className="text-xs mt-1 bg-muted/60"
-                        >
-                          <Hash className="w-3 h-3 mr-1" />
-                          {inst.code}
-                        </Badge>
+                        {inst.code && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs mt-1 bg-muted/60"
+                          >
+                            <Hash className="w-3 h-3 mr-1" />
+                            {inst.code}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -286,21 +288,24 @@ export default function InstituteManagementPage() {
                   setForm((f) => ({ ...f, name: e.target.value }))
                 }
                 placeholder="e.g., St. Xavier's College"
-                className="bg-input/60 border-border/60"
+                className="bg-input/60 border-border/60 text-foreground font-medium"
                 data-ocid="institutes.name.input"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5 text-sm">
                 <Hash className="w-3.5 h-3.5" /> Institute Code
+                <span className="text-xs text-muted-foreground font-normal">
+                  (optional)
+                </span>
               </Label>
               <Input
                 value={form.code}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, code: e.target.value }))
                 }
-                placeholder="e.g., SXC001"
-                className="bg-input/60 border-border/60"
+                placeholder="e.g., SXC001 (optional)"
+                className="bg-input/60 border-border/60 text-foreground font-medium"
                 data-ocid="institutes.code.input"
               />
             </div>
@@ -314,7 +319,7 @@ export default function InstituteManagementPage() {
                   setForm((f) => ({ ...f, location: e.target.value }))
                 }
                 placeholder="e.g., Mumbai, Maharashtra"
-                className="bg-input/60 border-border/60"
+                className="bg-input/60 border-border/60 text-foreground font-medium"
                 data-ocid="institutes.location.input"
               />
             </div>
