@@ -48,11 +48,14 @@ function getSessionMonths(): { value: string; label: string }[] {
       months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
     }
   }
-  return months;
+  return months.reverse();
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => 2020 + i);
+const YEARS = Array.from(
+  { length: CURRENT_YEAR - 2000 },
+  (_, i) => CURRENT_YEAR - i,
+);
 
 const fmt = (n: bigint | number) => `₹${Number(n).toLocaleString("en-IN")}`;
 

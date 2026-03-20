@@ -100,6 +100,7 @@ interface PeriodDay {
   year: number;
   isPrevMonth: boolean;
   isSunday: boolean;
+  dayName: string;
 }
 
 function getDaysInMonth(month: number, year: number) {
@@ -107,6 +108,7 @@ function getDaysInMonth(month: number, year: number) {
 }
 
 function getPeriodDays(month: number, year: number): PeriodDay[] {
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const daysInPrev = getDaysInMonth(prevMonth, prevYear);
@@ -120,6 +122,7 @@ function getPeriodDays(month: number, year: number): PeriodDay[] {
       year: prevYear,
       isPrevMonth: true,
       isSunday: dow === 0,
+      dayName: DOW[dow],
     });
   }
   for (let d = 1; d <= 24; d++) {
@@ -131,6 +134,7 @@ function getPeriodDays(month: number, year: number): PeriodDay[] {
       year,
       isPrevMonth: false,
       isSunday: dow === 0,
+      dayName: DOW[dow],
     });
   }
   return result;
@@ -515,7 +519,10 @@ export default function AttendancePage() {
                             : "cursor-pointer hover:scale-105 hover:shadow-md"
                         }`}
                       >
-                        <span className="text-[9px] opacity-70 leading-none mb-0.5">
+                        <span className="text-[9px] font-semibold opacity-80 leading-none mb-0.5">
+                          {day.dayName}
+                        </span>
+                        <span className="text-[9px] opacity-60 leading-none mb-0.5">
                           {SHORT_MONTH[day.month - 1]}
                         </span>
                         <span className="text-sm font-bold leading-none">

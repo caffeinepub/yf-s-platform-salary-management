@@ -1,30 +1,37 @@
-# Yf's Platform - Salary Management
+# Yf's Platform - Salary Management System
 
 ## Current State
-Employee Management page has an employee add/edit form with two internal tabs:
-- **Personal Details**: personal info fields
-- **Salary & Work Details**: basicSalary, ta, bankName, bankBranch, bankAccountNo, ifscCode, panNo, pfNumber, esiNumber, aadhaarNo, uanNo, licNo
+The app has a Motoko backend and React frontend. However, ALL data (institutes, employees, attendance, salary, daily workers, credentials, settings) is stored in **browser localStorage** — not in the backend canister. This causes data to be device-specific: data added on mobile is invisible on PC and vice versa. Additionally, month/year selectors in Reports, SalaryProcessing, and Payslip pages are ordered oldest-to-newest and start from 2020 instead of 2001.
 
 ## Requested Changes (Diff)
 
 ### Add
-- A new top-level tab called **"Salary Details"** inside the Employee Management page (above the employee list/form area)
-- This Salary Details tab shows a table of all employees with columns: Employee ID, Name, Designation, Institute, Basic Salary (₹), TA (₹), and an Edit/Save action
-- Each row is editable inline (or via a small modal) to set basicSalary and ta per employee
-- The main Employee Management view becomes tab 1 ("Employees") and the new view is tab 2 ("Salary Details")
+- Comprehensive Motoko backend storage for all entities: institutes, employees (with all 27+ fields), attendance (with leave types), salary (with all 30+ fields), daily workers (with status), employee credentials, admin password, salary config, promotion history
+- `deleteAttendance` and `deleteSalary` backend methods
+- Salary save/lock/delete in backend (currently only `processSalary` exists)
+- Backend methods for employee credentials CRUD
+- Backend methods for salary config and admin password
+- Backend methods for promotion history
 
 ### Modify
-- Employee add/edit form: remove the "Salary & Work Details" tab entirely
-- Merge these fields into the Personal Details tab: bankName, bankBranch, bankAccountNo, ifscCode, panNo, pfNumber, esiNumber, aadhaarNo, uanNo, licNo
-- Remove basicSalary and ta from the employee form (they will be set from the new Salary Details tab)
-- The Personal Details tab now has all fields in a logical grouping: personal info section, then bank & ID details section
+- `Employee` Motoko type: use Text for designation and employmentType (to support 151 designations); add all extended fields (department, religion, gender, category, employeeStatus, phone, emailId, bankName, bankBranch, bankAccountNo, ifscCode, panNo, pfNumber, esiNumber, aadhaarNo, uanNo, licNo, ta, bhelQuarter, profilePic)
+- `SalaryRecord` Motoko type: add all extended fields (ta, specialPay, lwp, daPercent, hraPercent, conveyanceAllowance, washingAllowance, ltc, festivalAdvance, incentive, bonus, daArrears, otherEarnings, houseRent, electricityCharges, lwf, epf, vpf, lic, profTax, incomeTax, festival, esi, security, otherDeductions, netEarnings)
+- `DailyWorker` Motoko type: add status field
+- `useQueries.ts`: replace all `localStore` calls with actual backend actor calls via `useActor`
+- `localStore.ts`: keep only as fallback/migration bridge, main operations go to backend
+- All pages that directly read from `localStorage` (DashboardPage, SalaryProcessingPage, ReportsPage, DailyWorkersPage, SettingsPage, LoginPage, EmployeeProfilePage, EmployeeSalarySlipsPage, EmployeeDashboardPage): rewrite to use hooks/actor instead
+- `YEARS` array in Reports, SalaryProcessing, Payslip pages: change to start from 2001 and sort newest-to-oldest (same as AttendancePage)
+- `getSessionMonths()` in Reports, SalaryProcessing, Payslip pages: ensure `.reverse()` is applied
 
 ### Remove
-- The "Salary & Work Details" tab from the employee add/edit form
+- Direct localStorage reads/writes for main data entities from page components
+- Old `empExtra_*` localStorage pattern (merge extra fields into main employee record)
+- `localStore.ts` dependency from `useQueries.ts` (replace with actor calls)
 
 ## Implementation Plan
-1. Add top-level tabs to EmployeeManagementPage: "Employees" and "Salary Details"
-2. Restructure the employee form to single tab (Personal Details) with bank/ID fields appended
-3. Remove basicSalary and ta from employee form state initializer and form rendering (keep them in employee data model for Salary Details tab usage)
-4. Create Salary Details tab: table listing employees, with inline editable basicSalary and ta fields per row, and a Save button per row
-5. Salary Details tab should filter by institute (add institute selector at top)
+1. Generate new Motoko backend with comprehensive Employee, Salary, Attendance, DailyWorker, Credentials, Settings types and all CRUD methods
+2. Rewrite `useQueries.ts` to call actor methods asynchronously; remove localStore imports
+3. Update `localStore.ts` to remove — or keep only as migration utility
+4. Rewrite all pages that directly access localStorage to use hooks from useQueries
+5. Fix YEARS and getSessionMonths in Reports, SalaryProcessing, Payslip pages
+6. Validate and deploy

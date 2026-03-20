@@ -57,8 +57,8 @@ const MONTHS = [
   "December",
 ];
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) =>
-  String(2020 + i),
+const YEARS = Array.from({ length: CURRENT_YEAR - 2000 }, (_, i) =>
+  String(CURRENT_YEAR - i),
 );
 
 function getSessionMonthNames(): string[] {
@@ -71,7 +71,7 @@ function getSessionMonthNames(): string[] {
     for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
     for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
   }
-  return result;
+  return result.reverse();
 }
 
 type Employee = {

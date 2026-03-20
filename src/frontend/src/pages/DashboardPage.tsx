@@ -364,15 +364,6 @@ export default function DashboardPage() {
                     {fmt(proj.esic)}
                   </span>
                 </div>
-                <div className="border-t border-border/30 pt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <BadgeIndianRupee className="w-3.5 h-3.5 text-amber-400" />{" "}
-                    Gross
-                  </div>
-                  <span className="font-semibold text-sm text-amber-400">
-                    {fmt(proj.gross)}
-                  </span>
-                </div>
               </CardContent>
             </Card>
           ))}
