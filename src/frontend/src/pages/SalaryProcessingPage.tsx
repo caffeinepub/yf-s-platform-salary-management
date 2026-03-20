@@ -56,7 +56,23 @@ const MONTHS = [
   "November",
   "December",
 ];
-const YEARS = ["2024", "2025", "2026"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) =>
+  String(2020 + i),
+);
+
+function getSessionMonthNames(): string[] {
+  const now = new Date();
+  const currentMonthIdx = now.getMonth();
+  const result: string[] = [];
+  if (currentMonthIdx >= 3) {
+    for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  } else {
+    for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
+    for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  }
+  return result;
+}
 
 type Employee = {
   id: string;
@@ -74,9 +90,10 @@ type SalaryRecord = {
   month: string;
   year: string;
   locked: boolean;
-  // Earnings
   basicPay: number;
   lwp: number;
+  lwpPrev: number;
+  lwpCurr: number;
   specialPay: number;
   daPercent: number;
   hraPercent: number;
@@ -90,7 +107,6 @@ type SalaryRecord = {
   incentive: number;
   otherEarnings: number;
   grossEarnings: number;
-  // Deductions
   houseRent: number;
   electricityCharges: number;
   lwf: number;
@@ -105,7 +121,6 @@ type SalaryRecord = {
   otherDeductions: number;
   totalDeductions: number;
   netEarnings: number;
-  // Legacy compat
   da?: number;
   hra?: number;
   gross?: number;
@@ -119,6 +134,8 @@ type SalaryRecord = {
 
 type SalaryInputs = {
   lwp: number;
+  lwpPrev: number;
+  lwpCurr: number;
   specialPay: number;
   daPercent: number;
   hraPercent: number;
@@ -140,6 +157,76 @@ type SalaryInputs = {
   security: number;
   otherDeductions: number;
 };
+
+function getDaysInMonthUtil(month: number, year: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function calculateLWPFromAttendance(
+  daysArray: string[],
+  month: number,
+  year: number,
+): { lwpPrev: number; lwpCurr: number } {
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const daysInPrevMonth = getDaysInMonthUtil(prevMonth, prevYear);
+
+  const parsed: Record<string, { status: string; leaveType?: string }> = {};
+  for (const item of daysArray) {
+    const parts = item.split(":");
+    parsed[parts[0]] = { status: parts[1], leaveType: parts[2] };
+  }
+
+  const allDays: Array<{ key: string; isPrev: boolean }> = [];
+  for (let d = 25; d <= daysInPrevMonth; d++)
+    allDays.push({ key: `prev_${d}`, isPrev: true });
+  for (let d = 1; d <= 24; d++) allDays.push({ key: String(d), isPrev: false });
+
+  const dayData = allDays.map((d) => ({
+    ...d,
+    status: parsed[d.key]?.status || "present",
+    leaveType: parsed[d.key]?.leaveType,
+  }));
+
+  const effectiveLWP = new Set<string>();
+  let i = 0;
+  while (i < dayData.length) {
+    if (dayData[i].status === "absent" || dayData[i].status === "holiday") {
+      let j = i;
+      while (
+        j < dayData.length &&
+        (dayData[j].status === "absent" || dayData[j].status === "holiday")
+      )
+        j++;
+      const run = dayData.slice(i, j);
+      const absentLeaveTypes = run
+        .filter((d) => d.status === "absent")
+        .map((d) => d.leaveType || "LWP");
+      const isCLRun =
+        absentLeaveTypes.length > 0 &&
+        absentLeaveTypes.every((lt) => lt === "CL");
+      for (const d of run) {
+        if (d.status === "absent" && d.leaveType === "LWP") {
+          effectiveLWP.add(d.key);
+        } else if (d.status === "holiday" || d.leaveType === "PH") {
+          if (!isCLRun) effectiveLWP.add(d.key);
+        }
+        // CL, EL, HPL, ML = paid (no LWP)
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+
+  let lwpPrev = 0;
+  let lwpCurr = 0;
+  for (const key of effectiveLWP) {
+    if (key.startsWith("prev_")) lwpPrev++;
+    else lwpCurr++;
+  }
+  return { lwpPrev, lwpCurr };
+}
 
 function defaultInputs(emp: Employee): SalaryInputs {
   const isRegular = emp.employmentType === "regular";
@@ -157,6 +244,8 @@ function defaultInputs(emp: Employee): SalaryInputs {
   })();
   return {
     lwp: 0,
+    lwpPrev: 0,
+    lwpCurr: 0,
     specialPay: 0,
     daPercent: isRegular ? 257 : 0,
     hraPercent: isRegular ? 20 : 0,
@@ -183,19 +272,32 @@ function defaultInputs(emp: Employee): SalaryInputs {
 function calcSalary(
   emp: Employee,
   inputs: SalaryInputs,
+  monthNum: number,
+  yearNum: number,
 ): Omit<SalaryRecord, "locked" | "month" | "year"> {
   const basic = Number(emp.basicSalary) || 0;
-  const workingDays = 26;
-  const presentDays = Math.max(0, workingDays - inputs.lwp);
-  const dailyBasic = basic / workingDays;
-  const adjustedBasic = Math.round(dailyBasic * presentDays);
+
+  const prevMonth = monthNum === 1 ? 12 : monthNum - 1;
+  const prevYear = monthNum === 1 ? yearNum - 1 : yearNum;
+  const totalPrev = getDaysInMonthUtil(prevMonth, prevYear);
+  const totalCurr = getDaysInMonthUtil(monthNum, yearNum);
+
+  const lwpDeduction = Math.round(
+    (basic * inputs.lwpPrev) / totalPrev + (basic * inputs.lwpCurr) / totalCurr,
+  );
+  const adjustedBasic = Math.max(0, basic - lwpDeduction);
 
   const da = Math.round((adjustedBasic * inputs.daPercent) / 100);
   const hra = Math.round((adjustedBasic * inputs.hraPercent) / 100);
+
+  const totalLWP = inputs.lwpPrev + inputs.lwpCurr;
+  const totalPeriodDays = totalPrev - 25 + 1 + 24;
   const ta =
-    inputs.lwp === 0
+    totalLWP === 0
       ? inputs.ta
-      : Math.round(inputs.ta * (presentDays / workingDays));
+      : Math.round(
+          inputs.ta * ((totalPeriodDays - totalLWP) / totalPeriodDays),
+        );
 
   const grossEarnings =
     adjustedBasic +
@@ -215,14 +317,12 @@ function calcSalary(
   const epf = Math.round(adjustedBasic * 0.12);
   const esi = grossEarnings <= 21000 ? Math.round(grossEarnings * 0.0075) : 0;
 
-  // Professional Tax: based on annual gross salary
   const annualGross = grossEarnings * 12;
   let profTax = 0;
   if (annualGross >= 400000) profTax = 208;
   else if (annualGross >= 300000) profTax = 167;
   else if (annualGross >= 225000) profTax = 125;
 
-  // Income Tax: new tax regime slabs on annual taxable income
   const annualTaxable = Math.max(0, grossEarnings * 12 - 75000);
   let annualIT = 0;
   if (annualTaxable > 2400000)
@@ -236,7 +336,6 @@ function calcSalary(
   else if (annualTaxable > 800000)
     annualIT = (annualTaxable - 800000) * 0.1 + 20000;
   else if (annualTaxable > 400000) annualIT = (annualTaxable - 400000) * 0.05;
-  // Section 87A rebate: no tax if income <= 7L and tax <= 25000
   if (annualTaxable <= 700000 && annualIT <= 25000) annualIT = 0;
   const incomeTax = Math.round(annualIT / 12);
 
@@ -259,7 +358,9 @@ function calcSalary(
   return {
     employeeId: emp.employeeId,
     basicPay: adjustedBasic,
-    lwp: inputs.lwp,
+    lwp: inputs.lwpPrev + inputs.lwpCurr,
+    lwpPrev: inputs.lwpPrev,
+    lwpCurr: inputs.lwpCurr,
     specialPay: inputs.specialPay,
     daPercent: inputs.daPercent,
     hraPercent: inputs.hraPercent,
@@ -287,7 +388,6 @@ function calcSalary(
     otherDeductions: inputs.otherDeductions,
     totalDeductions,
     netEarnings,
-    // Legacy compat
     da,
     hra,
     gross: grossEarnings,
@@ -377,6 +477,7 @@ export default function SalaryProcessingPage() {
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [selectedInstitute, setSelectedInstitute] = useState("all");
+  const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [salaryInputs, setSalaryInputs] = useState<
@@ -388,6 +489,9 @@ export default function SalaryProcessingPage() {
   const attendance = getAttendance();
   const salaries = getSalaries();
 
+  const selectedMonthNum = MONTHS.indexOf(selectedMonth) + 1;
+  const selectedYearNum = Number(selectedYear);
+
   const isCurrentMonth =
     selectedMonth === MONTHS[now.getMonth()] &&
     selectedYear === String(now.getFullYear());
@@ -397,9 +501,14 @@ export default function SalaryProcessingPage() {
       (Number(selectedYear) === now.getFullYear() &&
         MONTHS.indexOf(selectedMonth) < now.getMonth()));
 
-  const filteredEmployees = employees.filter(
+  const instituteEmployees = employees.filter(
     (e) => selectedInstitute === "all" || e.institute === selectedInstitute,
   );
+
+  const filteredEmployees =
+    selectedEmployee === "all"
+      ? instituteEmployees
+      : instituteEmployees.filter((e) => e.id === selectedEmployee);
 
   const prevMonthIdx =
     MONTHS.indexOf(selectedMonth) === 0
@@ -410,6 +519,21 @@ export default function SalaryProcessingPage() {
       ? String(Number(selectedYear) - 1)
       : selectedYear;
   const prevMonth = MONTHS[prevMonthIdx];
+
+  function getAttendanceDays(empId: string): string[] {
+    const rec = attendance.find(
+      (a: {
+        employeeId: string | number;
+        month: string | number;
+        year: string | number;
+        days: string[];
+      }) =>
+        String(a.employeeId) === String(empId) &&
+        Number(a.month) === selectedMonthNum &&
+        Number(a.year) === selectedYearNum,
+    );
+    return rec?.days || [];
+  }
 
   function getPrevMonthSalary(empId: string) {
     return salaries.find(
@@ -422,10 +546,14 @@ export default function SalaryProcessingPage() {
 
   function isAttendanceSaved(empId: string) {
     return attendance.some(
-      (a: { employeeId: string; month: string; year: string }) =>
-        a.employeeId === empId &&
-        a.month === selectedMonth &&
-        a.year === selectedYear,
+      (a: {
+        employeeId: string | number;
+        month: string | number;
+        year: string | number;
+      }) =>
+        String(a.employeeId) === String(empId) &&
+        Number(a.month) === selectedMonthNum &&
+        Number(a.year) === selectedYearNum,
     );
   }
 
@@ -447,14 +575,43 @@ export default function SalaryProcessingPage() {
     field: keyof SalaryInputs,
     value: number,
   ) {
-    setSalaryInputs((prev) => ({
-      ...prev,
-      [empId]: {
-        ...(prev[empId] ??
-          defaultInputs(employees.find((e) => e.employeeId === empId)!)),
-        [field]: value,
-      },
-    }));
+    setSalaryInputs((prev) => {
+      const current =
+        prev[empId] ??
+        defaultInputs(employees.find((e) => e.employeeId === empId)!);
+      const updated = { ...current, [field]: value };
+      // Keep lwp in sync as sum of lwpPrev + lwpCurr
+      if (field === "lwpPrev" || field === "lwpCurr") {
+        updated.lwp = updated.lwpPrev + updated.lwpCurr;
+      }
+      return { ...prev, [empId]: updated };
+    });
+  }
+
+  function expandEmployee(empId: string) {
+    const days = getAttendanceDays(empId);
+    if (days.length > 0) {
+      const { lwpPrev, lwpCurr } = calculateLWPFromAttendance(
+        days,
+        selectedMonthNum,
+        selectedYearNum,
+      );
+      setSalaryInputs((prev) => {
+        const emp = employees.find((e) => e.employeeId === empId);
+        const base =
+          prev[empId] ?? (emp ? defaultInputs(emp) : ({} as SalaryInputs));
+        return {
+          ...prev,
+          [empId]: {
+            ...base,
+            lwpPrev,
+            lwpCurr,
+            lwp: lwpPrev + lwpCurr,
+          },
+        };
+      });
+    }
+    setExpandedEmp(empId);
   }
 
   function handleProcess(emp: Employee) {
@@ -463,7 +620,7 @@ export default function SalaryProcessingPage() {
       return;
     }
     const inputs = getInputs(emp);
-    const calc = calcSalary(emp, inputs);
+    const calc = calcSalary(emp, inputs, selectedMonthNum, selectedYearNum);
     const newRecord: SalaryRecord = {
       ...calc,
       month: selectedMonth,
@@ -517,7 +674,10 @@ export default function SalaryProcessingPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Select
             value={selectedInstitute}
-            onValueChange={setSelectedInstitute}
+            onValueChange={(v) => {
+              setSelectedInstitute(v);
+              setSelectedEmployee("all");
+            }}
           >
             <SelectTrigger className="w-40 h-9">
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
@@ -532,13 +692,27 @@ export default function SalaryProcessingPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+            <SelectTrigger className="w-44 h-9">
+              <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="All Employees" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Employees</SelectItem>
+              {instituteEmployees.map((emp) => (
+                <SelectItem key={emp.id} value={emp.id}>
+                  {emp.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-36 h-9">
               <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {getSessionMonthNames().map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>
@@ -560,7 +734,6 @@ export default function SalaryProcessingPage() {
         </div>
       </div>
 
-      {/* Past month warning */}
       {isPast && (
         <div
           className="flex items-center gap-2 px-4 py-3 rounded-xl border"
@@ -594,7 +767,12 @@ export default function SalaryProcessingPage() {
             const isLocked = !!saved?.locked;
             const attSaved = isAttendanceSaved(emp.employeeId);
             const inputs = getInputs(emp);
-            const preview = calcSalary(emp, inputs);
+            const preview = calcSalary(
+              emp,
+              inputs,
+              selectedMonthNum,
+              selectedYearNum,
+            );
             const isExpanded = expandedEmp === emp.employeeId;
 
             return (
@@ -651,7 +829,6 @@ export default function SalaryProcessingPage() {
                     <p className="text-xs text-muted-foreground">
                       {emp.designation} | {emp.department} | {emp.institute}
                     </p>
-                    {/* Summary when locked */}
                     {isLocked && saved && (
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-muted-foreground">
@@ -678,7 +855,6 @@ export default function SalaryProcessingPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-3">
-                  {/* Collapsed summary for unlocked */}
                   {!isLocked && !isExpanded && (
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -711,6 +887,8 @@ export default function SalaryProcessingPage() {
                                     ...prev,
                                     [emp.employeeId]: {
                                       lwp: 0,
+                                      lwpPrev: 0,
+                                      lwpCurr: 0,
                                       specialPay: prevSal.specialPay ?? 0,
                                       daPercent:
                                         prevSal.daPercent ??
@@ -746,7 +924,7 @@ export default function SalaryProcessingPage() {
                                         prevSal.otherDeductions ?? 0,
                                     },
                                   }));
-                                  setExpandedEmp(emp.employeeId);
+                                  expandEmployee(emp.employeeId);
                                   toast.success(
                                     "Previous month salary loaded. You can edit before saving.",
                                   );
@@ -762,7 +940,7 @@ export default function SalaryProcessingPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs gap-1"
-                          onClick={() => setExpandedEmp(emp.employeeId)}
+                          onClick={() => expandEmployee(emp.employeeId)}
                         >
                           <ChevronDown className="w-3 h-3" /> Process
                         </Button>
@@ -770,7 +948,6 @@ export default function SalaryProcessingPage() {
                     </div>
                   )}
 
-                  {/* Expanded processing form */}
                   {!isLocked && isExpanded && (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
@@ -791,6 +968,8 @@ export default function SalaryProcessingPage() {
                                       ...prev,
                                       [emp.employeeId]: {
                                         lwp: 0,
+                                        lwpPrev: 0,
+                                        lwpCurr: 0,
                                         specialPay: prevSal.specialPay ?? 0,
                                         daPercent:
                                           prevSal.daPercent ??
@@ -864,11 +1043,23 @@ export default function SalaryProcessingPage() {
                             readOnly
                           />
                           <NumInput
-                            label="LWP Days"
-                            value={inputs.lwp}
+                            label="LWP Prev Month"
+                            value={inputs.lwpPrev}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "lwp", v)
+                              setInputField(emp.employeeId, "lwpPrev", v)
                             }
+                          />
+                          <NumInput
+                            label="LWP Curr Month"
+                            value={inputs.lwpCurr}
+                            onChange={(v) =>
+                              setInputField(emp.employeeId, "lwpCurr", v)
+                            }
+                          />
+                          <NumInput
+                            label="Total LWP Days"
+                            value={inputs.lwpPrev + inputs.lwpCurr}
+                            readOnly
                           />
                           <NumInput
                             label="Special Pay"
@@ -1143,7 +1334,7 @@ export default function SalaryProcessingPage() {
                           className="h-8 text-xs gap-1 gradient-primary"
                           onClick={() => handleProcess(emp)}
                           disabled={!attSaved || isPast}
-                          data-ocid={"salary.process_button"}
+                          data-ocid="salary.process_button"
                         >
                           <CheckCircle2 className="w-3 h-3" /> Process &amp;
                           Lock
@@ -1152,7 +1343,6 @@ export default function SalaryProcessingPage() {
                     </div>
                   )}
 
-                  {/* Locked: show delete button */}
                   {isLocked && !isPast && (
                     <div className="flex justify-end">
                       <Button
@@ -1166,7 +1356,6 @@ export default function SalaryProcessingPage() {
                     </div>
                   )}
 
-                  {/* Locked: info icon */}
                   {isLocked && isPast && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Info className="w-3 h-3" /> Past month records are

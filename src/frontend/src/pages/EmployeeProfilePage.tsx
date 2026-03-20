@@ -29,6 +29,7 @@ import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
+import { formatDate } from "../utils/dateUtils";
 
 function getEmployees(): any[] {
   try {
@@ -405,7 +406,7 @@ export default function EmployeeProfilePage() {
                   />
                   <ReadOnlyField
                     label="Date of Birth"
-                    value={emp.dob || "—"}
+                    value={formatDate(emp.dob)}
                     icon={Calendar}
                   />
                   <ReadOnlyField
@@ -509,7 +510,7 @@ export default function EmployeeProfilePage() {
             <ReadOnlyField label="LIC No" value={extra.licNo || "—"} />
             <ReadOnlyField
               label="Joining Date"
-              value={emp.joiningDate || "—"}
+              value={formatDate(emp.joiningDate)}
               icon={Calendar}
             />
             <ReadOnlyField

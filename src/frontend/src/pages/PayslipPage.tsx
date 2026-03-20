@@ -17,7 +17,7 @@ import {
   useGetSalary,
 } from "../hooks/useQueries";
 
-const MONTHS = [
+const MONTH_NAMES = [
   "January",
   "February",
   "March",
@@ -31,7 +31,28 @@ const MONTHS = [
   "November",
   "December",
 ];
-const YEARS = Array.from({ length: 11 }, (_, i) => 2020 + i);
+
+function getSessionMonths(): { value: string; label: string }[] {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const months: { value: string; label: string }[] = [];
+  if (currentMonth >= 4) {
+    for (let m = 4; m <= currentMonth; m++) {
+      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    }
+  } else {
+    for (let m = 4; m <= 12; m++) {
+      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    }
+    for (let m = 1; m <= currentMonth; m++) {
+      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    }
+  }
+  return months;
+}
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => 2020 + i);
 
 const fmt = (n: bigint | number) => `₹${Number(n).toLocaleString("en-IN")}`;
 
@@ -118,9 +139,9 @@ export default function PayslipPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {MONTHS.map((m) => (
-              <SelectItem key={m} value={(MONTHS.indexOf(m) + 1).toString()}>
-                {m}
+            {getSessionMonths().map((m) => (
+              <SelectItem key={m.value} value={m.value}>
+                {m.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -192,7 +213,7 @@ export default function PayslipPage() {
                     SALARY SLIP
                   </p>
                   <p className="text-sm font-semibold text-foreground">
-                    {MONTHS[month - 1]} {year}
+                    {MONTH_NAMES[month - 1]} {year}
                   </p>
                   {salary.isLocked && (
                     <Badge variant="secondary" className="gap-1 mt-2">

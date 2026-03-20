@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";
+import { formatDate } from "../utils/dateUtils";
 
 function getEmployees(): any[] {
   try {
@@ -124,7 +125,7 @@ export default function EmployeeDashboardPage() {
     },
     {
       label: "Joining Date",
-      value: emp.joiningDate || "—",
+      value: formatDate(emp.joiningDate),
       icon: Calendar,
       color: "oklch(0.60 0.20 30)",
     },

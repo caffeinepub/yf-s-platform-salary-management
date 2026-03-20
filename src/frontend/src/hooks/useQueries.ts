@@ -11,6 +11,7 @@ import {
   localAddDailyWorker,
   localAddEmployee,
   localAddInstitute,
+  localDeleteAttendance,
   localDeleteDailyWorker,
   localDeleteEmployee,
   localDeleteInstitute,
@@ -584,6 +585,20 @@ export function useProcessSalary() {
       return localProcessSalary(Number(data.employeeId), data.month, data.year);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["salary"] }),
+  });
+}
+
+export function useDeleteAttendance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      employeeId: bigint;
+      month: number;
+      year: number;
+    }) => {
+      localDeleteAttendance(Number(data.employeeId), data.month, data.year);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["attendance"] }),
   });
 }
 

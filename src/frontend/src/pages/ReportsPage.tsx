@@ -33,6 +33,7 @@ import {
   Users,
 } from "lucide-react";
 import { useState } from "react";
+import { formatToday } from "../utils/dateUtils";
 
 const MONTHS = [
   "January",
@@ -49,7 +50,23 @@ const MONTHS = [
   "December",
 ];
 
-const YEARS = ["2024", "2025", "2026"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) =>
+  String(2020 + i),
+);
+
+function getSessionMonthNames(): string[] {
+  const now = new Date();
+  const currentMonthIdx = now.getMonth(); // 0-based
+  const result: string[] = [];
+  if (currentMonthIdx >= 3) {
+    for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  } else {
+    for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
+    for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  }
+  return result;
+}
 
 type StoredEmployee = {
   id: string;
@@ -625,7 +642,7 @@ export default function ReportsPage() {
   </tbody>
 </table>
 <div class="footer">
-  Generated on ${new Date().toLocaleDateString("en-IN")} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
+  Generated on ${formatToday()} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
 </div>
 </body></html>`;
   }
@@ -967,7 +984,7 @@ export default function ReportsPage() {
 </table>
 
 <div class="footer">
-  Generated on ${new Date().toLocaleDateString("en-IN")} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
+  Generated on ${formatToday()} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
 </div>
 </body></html>`;
   }
@@ -1013,7 +1030,7 @@ export default function ReportsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {getSessionMonthNames().map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>

@@ -77,231 +77,160 @@ import {
   useGetEmployeesForInstitute,
   useUpdateEmployee,
 } from "../hooks/useQueries";
+import { formatDate } from "../utils/dateUtils";
 
-const DESIGNATIONS_GROUPED: {
-  header?: string;
-  value?: string;
-  label: string;
-  disabled?: boolean;
-}[] = [
-  // ===== SCHOOL =====
-  { header: "-- School --", label: "-- School --", disabled: true },
-  { value: "Principal", label: "Principal" },
-  { value: "Vice Principal", label: "Vice Principal" },
-  { value: "HOI (Head of Institution)", label: "HOI (Head of Institution)" },
-  { value: "Headmaster", label: "Headmaster" },
-  { value: "Headmistress", label: "Headmistress" },
-  { value: "Deputy Headmaster", label: "Deputy Headmaster" },
-  {
-    value: "PGT (Post Graduate Teacher)",
-    label: "PGT (Post Graduate Teacher)",
-  },
-  {
-    value: "TGT (Trained Graduate Teacher)",
-    label: "TGT (Trained Graduate Teacher)",
-  },
-  { value: "PRT (Primary Teacher)", label: "PRT (Primary Teacher)" },
-  { value: "NTT (Nursery Teacher)", label: "NTT (Nursery Teacher)" },
-  { value: "Senior Teacher", label: "Senior Teacher" },
-  { value: "Teacher", label: "Teacher" },
-  { value: "Assistant Teacher", label: "Assistant Teacher" },
-  { value: "Primary Teacher", label: "Primary Teacher" },
-  { value: "Physical Education Teacher", label: "Physical Education Teacher" },
-  {
-    value: "PET (Physical Education Teacher)",
-    label: "PET (Physical Education Teacher)",
-  },
-  { value: "Drawing Teacher", label: "Drawing Teacher" },
-  { value: "Music Teacher", label: "Music Teacher" },
-  { value: "Art & Craft Teacher", label: "Art & Craft Teacher" },
-  { value: "Dance Teacher", label: "Dance Teacher" },
-  { value: "Library Teacher", label: "Library Teacher" },
-  { value: "Librarian", label: "Librarian" },
-  { value: "Assistant Librarian", label: "Assistant Librarian" },
-  { value: "Lab Assistant", label: "Lab Assistant" },
-  { value: "Computer Teacher", label: "Computer Teacher" },
-  { value: "Tutor", label: "Tutor" },
-  { value: "Special Educator", label: "Special Educator" },
-  { value: "Counsellor", label: "Counsellor" },
-  { value: "School Nurse", label: "School Nurse" },
-  // ===== COLLEGE =====
-  {
-    header: "-- College / University --",
-    label: "-- College / University --",
-    disabled: true,
-  },
-  { value: "Vice Chancellor", label: "Vice Chancellor" },
-  { value: "Pro Vice Chancellor", label: "Pro Vice Chancellor" },
-  { value: "Registrar", label: "Registrar" },
-  { value: "Dean", label: "Dean" },
-  { value: "Associate Dean", label: "Associate Dean" },
-  { value: "Professor", label: "Professor" },
-  { value: "Associate Professor", label: "Associate Professor" },
-  { value: "Assistant Professor", label: "Assistant Professor" },
-  { value: "Senior Lecturer", label: "Senior Lecturer" },
-  { value: "Lecturer", label: "Lecturer" },
-  { value: "Assistant Lecturer", label: "Assistant Lecturer" },
-  { value: "Guest Lecturer", label: "Guest Lecturer" },
-  { value: "Visiting Faculty", label: "Visiting Faculty" },
-  { value: "Research Scholar", label: "Research Scholar" },
-  { value: "HOD (Head of Department)", label: "HOD (Head of Department)" },
-  { value: "Coordinator", label: "Coordinator" },
-  { value: "Academic Coordinator", label: "Academic Coordinator" },
-  { value: "Examination Controller", label: "Examination Controller" },
-  { value: "Admission Officer", label: "Admission Officer" },
-  { value: "College Librarian", label: "College Librarian" },
-  { value: "Lab Incharge", label: "Lab Incharge" },
-  // ===== HOSTEL =====
-  { header: "-- Hostel --", label: "-- Hostel --", disabled: true },
-  { value: "Chief Warden", label: "Chief Warden" },
-  { value: "Hostel Warden", label: "Hostel Warden" },
-  { value: "Assistant Warden", label: "Assistant Warden" },
-  { value: "Deputy Warden", label: "Deputy Warden" },
-  { value: "Hostel Superintendent", label: "Hostel Superintendent" },
-  { value: "Hostel Supervisor", label: "Hostel Supervisor" },
-  { value: "Hostel Manager", label: "Hostel Manager" },
-  { value: "Caretaker", label: "Caretaker" },
-  { value: "Hostel Attendant", label: "Hostel Attendant" },
-  { value: "Matron", label: "Matron" },
-  { value: "Cook", label: "Cook" },
-  { value: "Head Cook", label: "Head Cook" },
-  { value: "Assistant Cook", label: "Assistant Cook" },
-  { value: "Kitchen Helper", label: "Kitchen Helper" },
-  { value: "Housekeeping Staff", label: "Housekeeping Staff" },
-  { value: "Night Watchman", label: "Night Watchman" },
-  { value: "Mess Manager", label: "Mess Manager" },
-  { value: "Mess Supervisor", label: "Mess Supervisor" },
-  // ===== OFFICE =====
-  {
-    header: "-- Office / Administration --",
-    label: "-- Office / Administration --",
-    disabled: true,
-  },
-  { value: "Director", label: "Director" },
-  { value: "Managing Director", label: "Managing Director" },
-  { value: "Chief Executive Officer", label: "Chief Executive Officer" },
-  { value: "General Manager", label: "General Manager" },
-  { value: "Deputy General Manager", label: "Deputy General Manager" },
-  { value: "Assistant General Manager", label: "Assistant General Manager" },
-  { value: "Manager", label: "Manager" },
-  { value: "Deputy Manager", label: "Deputy Manager" },
-  { value: "Assistant Manager", label: "Assistant Manager" },
-  { value: "Superintendent", label: "Superintendent" },
-  { value: "Section Officer", label: "Section Officer" },
-  { value: "Deputy Section Officer", label: "Deputy Section Officer" },
-  { value: "Assistant Section Officer", label: "Assistant Section Officer" },
-  { value: "Office Superintendent", label: "Office Superintendent" },
-  { value: "Administrative Officer", label: "Administrative Officer" },
-  { value: "Admin Manager", label: "Admin Manager" },
-  { value: "Administrative Assistant", label: "Administrative Assistant" },
-  { value: "Office Assistant", label: "Office Assistant" },
-  { value: "Assistant", label: "Assistant" },
-  { value: "Senior Assistant", label: "Senior Assistant" },
-  { value: "Junior Assistant", label: "Junior Assistant" },
-  { value: "Supervisor", label: "Supervisor" },
-  { value: "Executive", label: "Executive" },
-  { value: "Senior Executive", label: "Senior Executive" },
-  { value: "Junior Executive", label: "Junior Executive" },
-  { value: "Officer", label: "Officer" },
-  { value: "Inspector", label: "Inspector" },
-  { value: "Personal Assistant", label: "Personal Assistant" },
-  { value: "Receptionist", label: "Receptionist" },
-  { value: "Front Desk Officer", label: "Front Desk Officer" },
-  { value: "Clerk", label: "Clerk" },
-  { value: "Senior Clerk", label: "Senior Clerk" },
-  { value: "Junior Clerk", label: "Junior Clerk" },
-  { value: "Record Keeper", label: "Record Keeper" },
-  { value: "Time Keeper", label: "Time Keeper" },
-  { value: "Data Entry Operator", label: "Data Entry Operator" },
-  { value: "Liaison Officer", label: "Liaison Officer" },
-  {
-    value: "PRO (Public Relations Officer)",
-    label: "PRO (Public Relations Officer)",
-  },
-  // ===== HR =====
-  {
-    header: "-- HR & Recruitment --",
-    label: "-- HR & Recruitment --",
-    disabled: true,
-  },
-  { value: "HR Manager", label: "HR Manager" },
-  { value: "HR Officer", label: "HR Officer" },
-  { value: "HR Assistant", label: "HR Assistant" },
-  { value: "Recruitment Officer", label: "Recruitment Officer" },
-  { value: "Training Officer", label: "Training Officer" },
-  { value: "Payroll Officer", label: "Payroll Officer" },
-  // ===== FINANCE & ACCOUNTS =====
-  {
-    header: "-- Finance & Accounts --",
-    label: "-- Finance & Accounts --",
-    disabled: true,
-  },
-  { value: "Chief Financial Officer", label: "Chief Financial Officer" },
-  { value: "Finance Manager", label: "Finance Manager" },
-  { value: "Finance Officer", label: "Finance Officer" },
-  { value: "Accounts Manager", label: "Accounts Manager" },
-  { value: "Senior Accountant", label: "Senior Accountant" },
-  { value: "Accountant", label: "Accountant" },
-  { value: "Account Assistant", label: "Account Assistant" },
-  { value: "Junior Accountant", label: "Junior Accountant" },
-  { value: "Cashier", label: "Cashier" },
-  { value: "Auditor", label: "Auditor" },
-  { value: "Internal Auditor", label: "Internal Auditor" },
-  { value: "CA (Chartered Accountant)", label: "CA (Chartered Accountant)" },
-  { value: "CMA (Cost Accountant)", label: "CMA (Cost Accountant)" },
-  { value: "Tax Consultant", label: "Tax Consultant" },
-  { value: "Tax Officer", label: "Tax Officer" },
-  { value: "Billing Clerk", label: "Billing Clerk" },
-  { value: "Budget Analyst", label: "Budget Analyst" },
-  // ===== PURCHASE & STORE =====
-  {
-    header: "-- Purchase & Store --",
-    label: "-- Purchase & Store --",
-    disabled: true,
-  },
-  { value: "Purchase Manager", label: "Purchase Manager" },
-  { value: "Purchase Officer", label: "Purchase Officer" },
-  { value: "Purchase Assistant", label: "Purchase Assistant" },
-  { value: "Store Manager", label: "Store Manager" },
-  { value: "Store Keeper", label: "Store Keeper" },
-  { value: "Store Assistant", label: "Store Assistant" },
-  { value: "Inventory Controller", label: "Inventory Controller" },
-  { value: "Logistics Officer", label: "Logistics Officer" },
-  { value: "Supply Chain Officer", label: "Supply Chain Officer" },
-  // ===== IT & TECHNICAL =====
-  {
-    header: "-- IT & Technical --",
-    label: "-- IT & Technical --",
-    disabled: true,
-  },
-  { value: "IT Manager", label: "IT Manager" },
-  { value: "System Administrator", label: "System Administrator" },
-  { value: "Network Engineer", label: "Network Engineer" },
-  { value: "Software Developer", label: "Software Developer" },
-  { value: "Technical Support Officer", label: "Technical Support Officer" },
-  { value: "Computer Operator", label: "Computer Operator" },
-  { value: "Lab Technician", label: "Lab Technician" },
-  { value: "Electronics Technician", label: "Electronics Technician" },
-  { value: "Electrician", label: "Electrician" },
-  { value: "Plumber", label: "Plumber" },
-  { value: "Carpenter", label: "Carpenter" },
-  { value: "Mechanic", label: "Mechanic" },
-  // ===== SECURITY & SUPPORT =====
-  {
-    header: "-- Security & Support --",
-    label: "-- Security & Support --",
-    disabled: true,
-  },
-  { value: "Security Officer", label: "Security Officer" },
-  { value: "Security Guard", label: "Security Guard" },
-  { value: "Watchman", label: "Watchman" },
-  { value: "Peon", label: "Peon" },
-  { value: "Attender", label: "Attender" },
-  { value: "Office Boy", label: "Office Boy" },
-  { value: "Driver", label: "Driver" },
-  { value: "Sweeper", label: "Sweeper" },
-  { value: "Gardner", label: "Gardner" },
-  { value: "Sanitation Worker", label: "Sanitation Worker" },
+const DESIGNATIONS: string[] = [
+  "Academic Coordinator",
+  "Account Assistant",
+  "Accountant",
+  "Accounts Manager",
+  "Additional Director",
+  "Admission Officer",
+  "Art & Craft Teacher",
+  "Assistant",
+  "Assistant General Manager",
+  "Assistant Lecturer",
+  "Assistant Librarian",
+  "Assistant Manager",
+  "Assistant Professor",
+  "Assistant Section Officer",
+  "Assistant Teacher",
+  "Assistant Warden",
+  "Associate Dean",
+  "Associate Professor",
+  "Auditor",
+  "Billing Clerk",
+  "Budget Analyst",
+  "CA (Chartered Accountant)",
+  "Caretaker",
+  "Carpenter",
+  "Cashier",
+  "Chief Financial Officer",
+  "Chief Warden",
+  "Clerk",
+  "CMA (Cost Accountant)",
+  "College Librarian",
+  "Computer Operator",
+  "Computer Teacher",
+  "Cook",
+  "Coordinator",
+  "Counsellor",
+  "Dance Teacher",
+  "Data Entry Operator",
+  "Dean",
+  "Deputy Director",
+  "Deputy General Manager",
+  "Deputy Headmaster",
+  "Deputy Manager",
+  "Deputy Warden",
+  "Director",
+  "Drawing Teacher",
+  "Driver",
+  "Electrician",
+  "Electronics Technician",
+  "Examination Controller",
+  "Executive",
+  "Finance Manager",
+  "Finance Officer",
+  "Front Desk Officer",
+  "Gardener",
+  "Gate Keeper",
+  "General Manager",
+  "Guest Lecturer",
+  "Head Cook",
+  "Headmaster",
+  "Headmistress",
+  "Helper",
+  "HOD (Head of Department)",
+  "HOI (Head of Institution)",
+  "Hostel Attendant",
+  "Hostel Manager",
+  "Hostel Superintendent",
+  "Hostel Supervisor",
+  "Hostel Warden",
+  "HR Assistant",
+  "HR Manager",
+  "HR Officer",
+  "Inspector",
+  "Internal Auditor",
+  "Inventory Controller",
+  "IT Manager",
+  "Joint Director",
+  "Junior Accountant",
+  "Junior Assistant",
+  "Junior Clerk",
+  "Junior Executive",
+  "Kitchen Staff",
+  "Lab Assistant",
+  "Lab Incharge",
+  "Lab Technician",
+  "Lecturer",
+  "Liaison Officer",
+  "Librarian",
+  "Library Teacher",
+  "Logistics Officer",
+  "Manager",
+  "Matron",
+  "Mechanic",
+  "Mess Supervisor",
+  "Music Teacher",
+  "Network Engineer",
+  "NTT (Nursery Teacher)",
+  "Office Boy",
+  "Officer",
+  "Payroll Officer",
+  "Peon",
+  "Personal Assistant",
+  "PET (Physical Education Teacher)",
+  "PGT (Post Graduate Teacher)",
+  "Physical Education Teacher",
+  "Plumber",
+  "Primary Teacher",
+  "Principal",
+  "PRO (Public Relations Officer)",
+  "Pro Vice Chancellor",
+  "Professor",
+  "PRT (Primary Teacher)",
+  "Purchase Assistant",
+  "Purchase Manager",
+  "Purchase Officer",
+  "Receptionist",
+  "Record Keeper",
+  "Recruitment Officer",
+  "Registrar",
+  "Research Scholar",
+  "School Nurse",
+  "Section Officer",
+  "Security Guard",
+  "Security Officer",
+  "Senior Accountant",
+  "Senior Assistant",
+  "Senior Clerk",
+  "Senior Executive",
+  "Senior Lecturer",
+  "Senior Security Guard",
+  "Senior Teacher",
+  "Software Developer",
+  "Special Educator",
+  "Store Assistant",
+  "Store Keeper",
+  "Store Manager",
+  "Supervisor",
+  "Supply Chain Officer",
+  "Sweeper",
+  "System Administrator",
+  "Tax Consultant",
+  "Tax Officer",
+  "Teacher",
+  "Technical Support Officer",
+  "TGT (Trained Graduate Teacher)",
+  "Time Keeper",
+  "Training Officer",
+  "Tutor",
+  "Vice Chancellor",
+  "Vice Principal",
+  "Visiting Faculty",
+  "Watchman",
 ];
 
 function mapDesignationToEnum(d: string): Designation {
@@ -475,7 +404,7 @@ function mapDesignationToEnum(d: string): Designation {
   ];
   if (lecture.includes(d)) return Designation.lecturer;
   if (academic.includes(d)) return Designation.adminStaff;
-  if (finance.includes(d)) return Designation.humanResources;
+  if (finance.includes(d)) return Designation.adminStaff;
   if (officer.includes(d)) return Designation.officer;
   if (Object.values(Designation).includes(d as Designation))
     return d as Designation;
@@ -660,7 +589,7 @@ export default function EmployeeManagementPage() {
 
   const openAdd = () => {
     setEditTarget(null);
-    setForm({ ...EMPTY_FORM, instituteId: effectiveInstId?.toString() ?? "" });
+    setForm({ ...EMPTY_FORM, instituteId: "" });
     setFormOpen(true);
   };
 
@@ -1073,7 +1002,7 @@ export default function EmployeeManagementPage() {
             >
               <SelectValue placeholder="Select Institute" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-72 overflow-y-auto">
               {institutes.map((i: Institute) => (
                 <SelectItem key={i.id.toString()} value={i.id.toString()}>
                   {i.name}
@@ -1177,7 +1106,9 @@ export default function EmployeeManagementPage() {
                       <div className="flex items-center gap-1.5">
                         <Briefcase className="w-3.5 h-3.5 text-primary/60" />
                         <span className="truncate">
-                          {designationLabel(emp.designation)}
+                          {designationLabel(
+                            extra.designation || emp.designation,
+                          )}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -1188,7 +1119,7 @@ export default function EmployeeManagementPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-success/60" />
-                        <span>{emp.joiningDate}</span>
+                        <span>{formatDate(emp.joiningDate)}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5 text-warning/60" />
@@ -1215,7 +1146,9 @@ export default function EmployeeManagementPage() {
                           setPromoTarget(emp);
                           setPromoForm({
                             type: "promotion",
-                            fromDesignation: designationLabel(emp.designation),
+                            fromDesignation: designationLabel(
+                              extra.designation || emp.designation,
+                            ),
                             toDesignation: "",
                             fromInstitute: getInstName(emp.instituteId),
                             toInstitute: "",
@@ -1358,23 +1291,12 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select designation" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {DESIGNATIONS_GROUPED.map((d) =>
-                          d.disabled ? (
-                            <SelectItem
-                              key={d.label}
-                              value={d.label}
-                              disabled
-                              className="font-bold text-xs text-muted-foreground uppercase py-1"
-                            >
-                              {d.label}
-                            </SelectItem>
-                          ) : (
-                            <SelectItem key={d.value} value={d.value!}>
-                              {d.label}
-                            </SelectItem>
-                          ),
-                        )}
+                      <SelectContent className="max-h-56 overflow-y-auto">
+                        {DESIGNATIONS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1956,7 +1878,9 @@ export default function EmployeeManagementPage() {
                         <span className="font-medium capitalize">
                           {h.type}: {h.from} → {h.to}
                         </span>
-                        <span className="text-muted-foreground">{h.date}</span>
+                        <span className="text-muted-foreground">
+                          {formatDate(h.date)}
+                        </span>
                       </div>
                     ))}
                   </div>

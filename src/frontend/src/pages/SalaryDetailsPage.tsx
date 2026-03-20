@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Filter, IndianRupee, Loader2 } from "lucide-react";
+import { Filter, IndianRupee, Loader2, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -44,6 +44,7 @@ export default function SalaryDetailsPage() {
   const { data: institutes = [], isLoading: loadingInstitutes } =
     useGetAllInstitutes();
   const [instId, setInstId] = useState<string>("all");
+  const [selectedEmpId, setSelectedEmpId] = useState<string>("all");
   const [salaryEdits, setSalaryEdits] = useState<
     Record<string, { basic: string; ta: string }>
   >({});
@@ -58,10 +59,23 @@ export default function SalaryDetailsPage() {
 
   const isLoading = loadingInstitutes || loadingEmps;
 
-  const filteredEmps =
+  const instituteEmployees =
     instId === "all"
       ? employees
       : employees.filter((e: Employee) => e.instituteId.toString() === instId);
+
+  const filteredEmps =
+    selectedEmpId === "all"
+      ? instituteEmployees
+      : instituteEmployees.filter(
+          (e: Employee) => e.employeeId === selectedEmpId,
+        );
+
+  // Reset employee selection when institute changes
+  function handleInstChange(val: string) {
+    setInstId(val);
+    setSelectedEmpId("all");
+  }
 
   function getSalaryEdit(
     empId: string,
@@ -127,11 +141,12 @@ export default function SalaryDetailsPage() {
             Set Basic Salary and TA for each employee
           </p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-64">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <Select value={instId} onValueChange={setInstId}>
+          {/* Institute Selector */}
+          <Select value={instId} onValueChange={handleInstChange}>
             <SelectTrigger
-              className="bg-card/60 border-border/60"
+              className="bg-card/60 border-border/60 w-44"
               data-ocid="salary_details.institute.select"
             >
               <SelectValue placeholder="All Institutes" />
@@ -141,6 +156,28 @@ export default function SalaryDetailsPage() {
               {institutes.map((i: Institute) => (
                 <SelectItem key={i.id.toString()} value={i.id.toString()}>
                   {i.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Employee Selector */}
+          <Select
+            value={selectedEmpId}
+            onValueChange={setSelectedEmpId}
+            disabled={instId === "all"}
+          >
+            <SelectTrigger
+              className="bg-card/60 border-border/60 w-44"
+              data-ocid="salary_details.employee.select"
+            >
+              <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="All Employees" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Employees</SelectItem>
+              {instituteEmployees.map((emp: Employee) => (
+                <SelectItem key={emp.employeeId} value={emp.employeeId}>
+                  {emp.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -168,7 +205,9 @@ export default function SalaryDetailsPage() {
             No employees found
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            Add employees first to manage salary details
+            {instId === "all"
+              ? "Select an institute to view employees"
+              : "Add employees first to manage salary details"}
           </p>
         </motion.div>
       ) : (
@@ -226,6 +265,9 @@ export default function SalaryDetailsPage() {
                         institutes.find(
                           (i: Institute) => i.id === emp.instituteId,
                         )?.name ?? "—";
+                      // Use extra.designation (human-readable) over backend enum value
+                      const displayDesignation =
+                        extra.designation || emp.designation;
                       return (
                         <TableRow
                           key={emp.id.toString()}
@@ -242,7 +284,7 @@ export default function SalaryDetailsPage() {
                             {emp.name}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {emp.designation}
+                            {displayDesignation}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {instName}

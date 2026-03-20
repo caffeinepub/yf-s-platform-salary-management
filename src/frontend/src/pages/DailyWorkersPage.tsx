@@ -224,7 +224,10 @@ export default function DailyWorkersPage() {
 
   const institutes = getInstitutes();
   const yearPeriods = generatePeriods(Number(selectedYear));
-  const years = ["2024", "2025", "2026"];
+  const years = Array.from(
+    { length: new Date().getFullYear() - 2019 },
+    (_, i) => String(2020 + i),
+  );
 
   const filteredWorkers = workers.filter(
     (w) => filterInstitute === "all" || w.institute === filterInstitute,

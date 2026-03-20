@@ -184,7 +184,7 @@ export function localSaveAttendance(
     days,
     totalPresent: days.filter((d) => d === "P").length,
     totalAbsent: days.filter((d) => d === "A").length,
-    isLocked: false,
+    isLocked: true,
   };
   if (existing >= 0) all[existing] = record;
   else all.push(record);
@@ -200,6 +200,18 @@ export function localLockAttendance(
     a.employeeId === employeeId && a.month === month && a.year === year
       ? { ...a, isLocked: true }
       : a,
+  );
+  saveAll(KEYS.attendance, all);
+}
+
+export function localDeleteAttendance(
+  employeeId: number,
+  month: number,
+  year: number,
+) {
+  const all = getAll<LocalAttendanceRecord>(KEYS.attendance).filter(
+    (a) =>
+      !(a.employeeId === employeeId && a.month === month && a.year === year),
   );
   saveAll(KEYS.attendance, all);
 }
