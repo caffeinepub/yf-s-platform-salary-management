@@ -9,6 +9,7 @@ import {
   ChevronRight,
   FileText,
   HardHat,
+  IndianRupee,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -45,6 +46,12 @@ const NAV_ITEMS: NavItem[] = [
     id: "employees",
     label: "Employee Management",
     icon: <Users className="w-5 h-5" />,
+    adminOnly: true,
+  },
+  {
+    id: "employeeSalary",
+    label: "Salary Details",
+    icon: <IndianRupee className="w-5 h-5" />,
     adminOnly: true,
   },
   {

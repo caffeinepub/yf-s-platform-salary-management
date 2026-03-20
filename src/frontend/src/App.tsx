@@ -15,6 +15,7 @@ import InstituteManagementPage from "./pages/InstituteManagementPage";
 import LoginPage from "./pages/LoginPage";
 import PayslipPage from "./pages/PayslipPage";
 import ReportsPage from "./pages/ReportsPage";
+import SalaryDetailsPage from "./pages/SalaryDetailsPage";
 import SalaryProcessingPage from "./pages/SalaryProcessingPage";
 import SettingsPage from "./pages/SettingsPage";
 
@@ -22,6 +23,7 @@ export type PageName =
   | "dashboard"
   | "institutes"
   | "employees"
+  | "employeeSalary"
   | "attendance"
   | "salary"
   | "payslip"
@@ -219,6 +221,8 @@ function AppInner() {
         return <InstituteManagementPage />;
       case "employees":
         return <EmployeeManagementPage />;
+      case "employeeSalary":
+        return <SalaryDetailsPage />;
       case "attendance":
         return <AttendancePage />;
       case "salary":

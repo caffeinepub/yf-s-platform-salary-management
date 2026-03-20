@@ -28,7 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowRightLeft,
@@ -642,7 +649,6 @@ export default function EmployeeManagementPage() {
   }
 
   const [form, setForm] = useState<EmpForm>(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState("personal");
 
   const effectiveInstId = selectedInstId ?? institutes[0]?.id ?? null;
 
@@ -654,14 +660,12 @@ export default function EmployeeManagementPage() {
 
   const openAdd = () => {
     setEditTarget(null);
-    setActiveTab("personal");
     setForm({ ...EMPTY_FORM, instituteId: effectiveInstId?.toString() ?? "" });
     setFormOpen(true);
   };
 
   const openEdit = (emp: Employee) => {
     setEditTarget(emp);
-    setActiveTab("personal");
     const extra = getEmpExtra(emp.employeeId);
     setForm({
       name: emp.name,
@@ -1261,548 +1265,483 @@ export default function EmployeeManagementPage() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="mt-2">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full mb-5 grid grid-cols-2">
-                <TabsTrigger
-                  value="personal"
-                  className="gap-2"
-                  data-ocid="employees.personal.tab"
-                >
-                  <User className="w-3.5 h-3.5" /> Personal Details
-                </TabsTrigger>
-                <TabsTrigger
-                  value="salary"
-                  className="gap-2"
-                  data-ocid="employees.salary.tab"
-                >
-                  <DollarSign className="w-3.5 h-3.5" /> Salary &amp; Work
-                </TabsTrigger>
-              </TabsList>
-
-              {/* PERSONAL DETAILS */}
-              <TabsContent value="personal">
-                <motion.div
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  {/* Profile Pic */}
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {form.profilePic ? (
-                        <img
-                          src={form.profilePic}
-                          alt="Profile"
-                          className="w-16 h-16 rounded-xl object-cover"
-                          style={{
-                            border: "2px solid oklch(0.50 0.25 260 / 0.5)",
-                          }}
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-xl gradient-primary flex items-center justify-center text-white font-bold text-xl">
-                          {form.name ? (
-                            form.name.slice(0, 2).toUpperCase()
-                          ) : (
-                            <User className="w-6 h-6" />
-                          )}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => picRef.current?.click()}
-                        className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center"
+            <div>
+              <motion.div
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-4"
+              >
+                {/* Profile Pic */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    {form.profilePic ? (
+                      <img
+                        src={form.profilePic}
+                        alt="Profile"
+                        className="w-16 h-16 rounded-xl object-cover"
                         style={{
-                          background: "oklch(0.50 0.25 260)",
-                          border: "2px solid oklch(0.14 0.06 260)",
+                          border: "2px solid oklch(0.50 0.25 260 / 0.5)",
                         }}
-                        data-ocid="employees.profile_pic.upload_button"
-                      >
-                        <Camera className="w-3 h-3 text-white" />
-                      </button>
-                      <input
-                        ref={picRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePicChange}
                       />
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <p className="font-medium">Profile Picture</p>
-                      <p>Click the camera icon to upload</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Briefcase className="w-3 h-3" />
-                        Employee ID *
-                      </Label>
-                      <Input
-                        value={form.employeeId}
-                        onChange={(e) => setField("employeeId", e.target.value)}
-                        placeholder="e.g., 433"
-                        className={inputCls}
-                        data-ocid="employees.employeeid.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <User className="w-3 h-3" />
-                        Full Name *
-                      </Label>
-                      <Input
-                        value={form.name}
-                        onChange={(e) => setField("name", e.target.value)}
-                        placeholder="e.g., Sachin Patel"
-                        className={inputCls}
-                        data-ocid="employees.name.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Designation *</Label>
-                      <Select
-                        value={form.designation}
-                        onValueChange={(v) => setField("designation", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.designation.select"
-                        >
-                          <SelectValue placeholder="Select designation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DESIGNATIONS_GROUPED.map((d) =>
-                            d.disabled ? (
-                              <SelectItem
-                                key={d.label}
-                                value={d.label}
-                                disabled
-                                className="font-bold text-xs text-muted-foreground uppercase py-1"
-                              >
-                                {d.label}
-                              </SelectItem>
-                            ) : (
-                              <SelectItem key={d.value} value={d.value!}>
-                                {d.label}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Department</Label>
-                      <Input
-                        value={form.department}
-                        onChange={(e) => setField("department", e.target.value)}
-                        placeholder="e.g., Engineering"
-                        className={inputCls}
-                        data-ocid="employees.department.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Building2 className="w-3 h-3" />
-                        Institute *
-                      </Label>
-                      <Select
-                        value={form.instituteId}
-                        onValueChange={(v) => setField("instituteId", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.institute_select.select"
-                        >
-                          <SelectValue placeholder="Select institute" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {institutes.map((i: Institute) => (
-                            <SelectItem
-                              key={i.id.toString()}
-                              value={i.id.toString()}
-                            >
-                              {i.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">BHEL Quarter</Label>
-                      <Select
-                        value={form.bhelQuarter}
-                        onValueChange={(v) => setField("bhelQuarter", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.bhelquarter.select"
-                        >
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Calendar className="w-3 h-3" />
-                        Date of Birth
-                      </Label>
-                      <Input
-                        type="date"
-                        value={form.dob}
-                        onChange={(e) => setField("dob", e.target.value)}
-                        className={inputCls}
-                        data-ocid="employees.dob.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Religion</Label>
-                      <Select
-                        value={form.religion}
-                        onValueChange={(v) => setField("religion", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.religion.select"
-                        >
-                          <SelectValue placeholder="Select religion" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            "Hindu",
-                            "Muslim",
-                            "Christian",
-                            "Sikh",
-                            "Buddhist",
-                            "Jain",
-                            "Zoroastrian (Parsi)",
-                            "Jewish",
-                            "Bahá'í",
-                            "Tribal Religion",
-                            "Other",
-                          ].map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Gender</Label>
-                      <Select
-                        value={form.gender}
-                        onValueChange={(v) => setField("gender", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.gender.select"
-                        >
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Category</Label>
-                      <Select
-                        value={form.category}
-                        onValueChange={(v) => setField("category", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.category.select"
-                        >
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general">General</SelectItem>
-                          <SelectItem value="obc">OBC</SelectItem>
-                          <SelectItem value="sc">SC</SelectItem>
-                          <SelectItem value="st">ST</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Employee Type *</Label>
-                      <Select
-                        value={form.employeeType}
-                        onValueChange={(v) => setField("employeeType", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.employmenttype.select"
-                        >
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={EmploymentType.regular}>
-                            Regular
-                          </SelectItem>
-                          <SelectItem value={EmploymentType.temporary}>
-                            Temporary
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Employee Status</Label>
-                      <Select
-                        value={form.employeeStatus}
-                        onValueChange={(v) => setField("employeeStatus", v)}
-                      >
-                        <SelectTrigger
-                          className={inputCls}
-                          data-ocid="employees.status.select"
-                        >
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="resigned">Resigned</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Phone className="w-3 h-3" />
-                        Phone
-                      </Label>
-                      <Input
-                        value={form.phone}
-                        onChange={(e) => setField("phone", e.target.value)}
-                        placeholder="e.g., 9876543210"
-                        className={inputCls}
-                        data-ocid="employees.phone.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Email ID</Label>
-                      <Input
-                        type="email"
-                        value={form.emailId}
-                        onChange={(e) => setField("emailId", e.target.value)}
-                        placeholder="e.g., sachin@example.com"
-                        className={inputCls}
-                        data-ocid="employees.email.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Calendar className="w-3 h-3" />
-                        Joining Date
-                      </Label>
-                      <Input
-                        type="date"
-                        value={form.joiningDate}
-                        onChange={(e) =>
-                          setField("joiningDate", e.target.value)
-                        }
-                        className={inputCls}
-                        data-ocid="employees.joiningdate.input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-1.5 text-xs">
-                      <MapPin className="w-3 h-3" />
-                      Address
-                    </Label>
-                    <Textarea
-                      value={form.address}
-                      onChange={(e) => setField("address", e.target.value)}
-                      placeholder="Full address"
-                      className={inputCls}
-                      rows={2}
-                      data-ocid="employees.address.input"
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl gradient-primary flex items-center justify-center text-white font-bold text-xl">
+                        {form.name ? (
+                          form.name.slice(0, 2).toUpperCase()
+                        ) : (
+                          <User className="w-6 h-6" />
+                        )}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => picRef.current?.click()}
+                      className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center"
+                      style={{
+                        background: "oklch(0.50 0.25 260)",
+                        border: "2px solid oklch(0.14 0.06 260)",
+                      }}
+                      data-ocid="employees.profile_pic.upload_button"
+                    >
+                      <Camera className="w-3 h-3 text-white" />
+                    </button>
+                    <input
+                      ref={picRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePicChange}
                     />
                   </div>
+                  <div className="text-xs text-muted-foreground">
+                    <p className="font-medium">Profile Picture</p>
+                    <p>Click the camera icon to upload</p>
+                  </div>
+                </div>
 
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      type="button"
-                      onClick={() => setActiveTab("salary")}
-                      className="gradient-primary text-white border-0 gap-2"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Briefcase className="w-3 h-3" />
+                      Employee ID *
+                    </Label>
+                    <Input
+                      value={form.employeeId}
+                      onChange={(e) => setField("employeeId", e.target.value)}
+                      placeholder="e.g., 433"
+                      className={inputCls}
+                      data-ocid="employees.employeeid.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <User className="w-3 h-3" />
+                      Full Name *
+                    </Label>
+                    <Input
+                      value={form.name}
+                      onChange={(e) => setField("name", e.target.value)}
+                      placeholder="e.g., Sachin Patel"
+                      className={inputCls}
+                      data-ocid="employees.name.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Designation *</Label>
+                    <Select
+                      value={form.designation}
+                      onValueChange={(v) => setField("designation", v)}
                     >
-                      Next: Salary &amp; Work Details →
-                    </Button>
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.designation.select"
+                      >
+                        <SelectValue placeholder="Select designation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DESIGNATIONS_GROUPED.map((d) =>
+                          d.disabled ? (
+                            <SelectItem
+                              key={d.label}
+                              value={d.label}
+                              disabled
+                              className="font-bold text-xs text-muted-foreground uppercase py-1"
+                            >
+                              {d.label}
+                            </SelectItem>
+                          ) : (
+                            <SelectItem key={d.value} value={d.value!}>
+                              {d.label}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </motion.div>
-              </TabsContent>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Department</Label>
+                    <Input
+                      value={form.department}
+                      onChange={(e) => setField("department", e.target.value)}
+                      placeholder="e.g., Engineering"
+                      className={inputCls}
+                      data-ocid="employees.department.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Building2 className="w-3 h-3" />
+                      Institute *
+                    </Label>
+                    <Select
+                      value={form.instituteId}
+                      onValueChange={(v) => setField("instituteId", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.institute_select.select"
+                      >
+                        <SelectValue placeholder="Select institute" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {institutes.map((i: Institute) => (
+                          <SelectItem
+                            key={i.id.toString()}
+                            value={i.id.toString()}
+                          >
+                            {i.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">BHEL Quarter</Label>
+                    <Select
+                      value={form.bhelQuarter}
+                      onValueChange={(v) => setField("bhelQuarter", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.bhelquarter.select"
+                      >
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Calendar className="w-3 h-3" />
+                      Date of Birth
+                    </Label>
+                    <Input
+                      type="date"
+                      value={form.dob}
+                      onChange={(e) => setField("dob", e.target.value)}
+                      className={inputCls}
+                      data-ocid="employees.dob.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Religion</Label>
+                    <Select
+                      value={form.religion}
+                      onValueChange={(v) => setField("religion", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.religion.select"
+                      >
+                        <SelectValue placeholder="Select religion" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          "Hindu",
+                          "Muslim",
+                          "Christian",
+                          "Sikh",
+                          "Buddhist",
+                          "Jain",
+                          "Zoroastrian (Parsi)",
+                          "Jewish",
+                          "Bahá'í",
+                          "Tribal Religion",
+                          "Other",
+                        ].map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Gender</Label>
+                    <Select
+                      value={form.gender}
+                      onValueChange={(v) => setField("gender", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.gender.select"
+                      >
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Category</Label>
+                    <Select
+                      value={form.category}
+                      onValueChange={(v) => setField("category", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.category.select"
+                      >
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="obc">OBC</SelectItem>
+                        <SelectItem value="sc">SC</SelectItem>
+                        <SelectItem value="st">ST</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Employee Type *</Label>
+                    <Select
+                      value={form.employeeType}
+                      onValueChange={(v) => setField("employeeType", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.employmenttype.select"
+                      >
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={EmploymentType.regular}>
+                          Regular
+                        </SelectItem>
+                        <SelectItem value={EmploymentType.temporary}>
+                          Temporary
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Employee Status</Label>
+                    <Select
+                      value={form.employeeStatus}
+                      onValueChange={(v) => setField("employeeStatus", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.status.select"
+                      >
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="resigned">Resigned</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Phone className="w-3 h-3" />
+                      Phone
+                    </Label>
+                    <Input
+                      value={form.phone}
+                      onChange={(e) => setField("phone", e.target.value)}
+                      placeholder="e.g., 9876543210"
+                      className={inputCls}
+                      data-ocid="employees.phone.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Email ID</Label>
+                    <Input
+                      type="email"
+                      value={form.emailId}
+                      onChange={(e) => setField("emailId", e.target.value)}
+                      placeholder="e.g., sachin@example.com"
+                      className={inputCls}
+                      data-ocid="employees.email.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <Calendar className="w-3 h-3" />
+                      Joining Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={form.joiningDate}
+                      onChange={(e) => setField("joiningDate", e.target.value)}
+                      className={inputCls}
+                      data-ocid="employees.joiningdate.input"
+                    />
+                  </div>
+                </div>
 
-              {/* SALARY & WORK DETAILS */}
-              <TabsContent value="salary">
-                <motion.div
-                  initial={{ opacity: 0, x: 12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <DollarSign className="w-3 h-3" />
-                        Basic Salary (₹)
-                      </Label>
-                      <Input
-                        type="number"
-                        value={form.basicSalary}
-                        onChange={(e) =>
-                          setField("basicSalary", e.target.value)
-                        }
-                        placeholder="e.g., 25000"
-                        className={inputCls}
-                        data-ocid="employees.salary.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Car className="w-3 h-3" />
-                        TA - Travel Allowance (₹)
-                      </Label>
-                      <Input
-                        type="number"
-                        value={form.ta}
-                        onChange={(e) => setField("ta", e.target.value)}
-                        placeholder="e.g., 1500"
-                        className={inputCls}
-                        data-ocid="employees.ta.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <CreditCard className="w-3 h-3" />
-                        Bank Name
-                      </Label>
-                      <Input
-                        value={form.bankName}
-                        onChange={(e) => setField("bankName", e.target.value)}
-                        placeholder="e.g., State Bank of India"
-                        className={inputCls}
-                        data-ocid="employees.bank_name.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Bank Branch</Label>
-                      <Input
-                        value={form.bankBranch}
-                        onChange={(e) => setField("bankBranch", e.target.value)}
-                        placeholder="e.g., Anand Branch"
-                        className={inputCls}
-                        data-ocid="employees.bank_branch.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <CreditCard className="w-3 h-3" />
-                        Bank Account No
-                      </Label>
-                      <Input
-                        value={form.bankAccountNo}
-                        onChange={(e) =>
-                          setField("bankAccountNo", e.target.value)
-                        }
-                        placeholder="e.g., 0012345678901"
-                        className={inputCls}
-                        data-ocid="employees.bank_account.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">IFSC Code</Label>
-                      <Input
-                        value={form.ifscCode}
-                        onChange={(e) =>
-                          setField("ifscCode", e.target.value.toUpperCase())
-                        }
-                        placeholder="e.g., SBIN0001234"
-                        className={inputCls}
-                        data-ocid="employees.ifsc.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <ShieldCheck className="w-3 h-3" />
-                        PAN No
-                      </Label>
-                      <Input
-                        value={form.panNo}
-                        onChange={(e) =>
-                          setField("panNo", e.target.value.toUpperCase())
-                        }
-                        placeholder="e.g., ABCDE1234F"
-                        className={inputCls}
-                        data-ocid="employees.pan.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">PF Number</Label>
-                      <Input
-                        value={form.pfNumber}
-                        onChange={(e) => setField("pfNumber", e.target.value)}
-                        placeholder="e.g., MH/BAN/001234"
-                        className={inputCls}
-                        data-ocid="employees.pf_account.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">ESI Number</Label>
-                      <Input
-                        value={form.esiNumber}
-                        onChange={(e) => setField("esiNumber", e.target.value)}
-                        placeholder="e.g., 4100012345"
-                        className={inputCls}
-                        data-ocid="employees.esic.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <ShieldCheck className="w-3 h-3" />
-                        Aadhaar No
-                      </Label>
-                      <Input
-                        value={form.aadhaarNo}
-                        onChange={(e) => setField("aadhaarNo", e.target.value)}
-                        placeholder="e.g., 1234 5678 9012"
-                        className={inputCls}
-                        data-ocid="employees.aadhar.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">UAN No</Label>
-                      <Input
-                        value={form.uanNo}
-                        onChange={(e) => setField("uanNo", e.target.value)}
-                        placeholder="e.g., 100123456789"
-                        className={inputCls}
-                        data-ocid="employees.uan.input"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">LIC No</Label>
-                      <Input
-                        value={form.licNo}
-                        onChange={(e) => setField("licNo", e.target.value)}
-                        placeholder="e.g., 123456789"
-                        className={inputCls}
-                        data-ocid="employees.lic.input"
-                      />
-                    </div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5 text-xs">
+                    <MapPin className="w-3 h-3" />
+                    Address
+                  </Label>
+                  <Textarea
+                    value={form.address}
+                    onChange={(e) => setField("address", e.target.value)}
+                    placeholder="Full address"
+                    className={inputCls}
+                    rows={2}
+                    data-ocid="employees.address.input"
+                  />
+                </div>
+
+                {/* Bank & ID Details */}
+                <div className="mt-6 pt-4 border-t border-border/40">
+                  <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5" />
+                    Bank &amp; ID Details
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <CreditCard className="w-3 h-3" />
+                      Bank Name
+                    </Label>
+                    <Input
+                      value={form.bankName}
+                      onChange={(e) => setField("bankName", e.target.value)}
+                      placeholder="e.g., State Bank of India"
+                      className={inputCls}
+                      data-ocid="employees.bank_name.input"
+                    />
                   </div>
-                </motion.div>
-              </TabsContent>
-            </Tabs>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Bank Branch</Label>
+                    <Input
+                      value={form.bankBranch}
+                      onChange={(e) => setField("bankBranch", e.target.value)}
+                      placeholder="e.g., Anand Branch"
+                      className={inputCls}
+                      data-ocid="employees.bank_branch.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <CreditCard className="w-3 h-3" />
+                      Bank Account No
+                    </Label>
+                    <Input
+                      value={form.bankAccountNo}
+                      onChange={(e) =>
+                        setField("bankAccountNo", e.target.value)
+                      }
+                      placeholder="e.g., 0012345678901"
+                      className={inputCls}
+                      data-ocid="employees.bank_account.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">IFSC Code</Label>
+                    <Input
+                      value={form.ifscCode}
+                      onChange={(e) =>
+                        setField("ifscCode", e.target.value.toUpperCase())
+                      }
+                      placeholder="e.g., SBIN0001234"
+                      className={inputCls}
+                      data-ocid="employees.ifsc.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <ShieldCheck className="w-3 h-3" />
+                      PAN No
+                    </Label>
+                    <Input
+                      value={form.panNo}
+                      onChange={(e) =>
+                        setField("panNo", e.target.value.toUpperCase())
+                      }
+                      placeholder="e.g., ABCDE1234F"
+                      className={inputCls}
+                      data-ocid="employees.pan.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">PF Number</Label>
+                    <Input
+                      value={form.pfNumber}
+                      onChange={(e) => setField("pfNumber", e.target.value)}
+                      placeholder="e.g., MH/BAN/001234"
+                      className={inputCls}
+                      data-ocid="employees.pf_account.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">ESI Number</Label>
+                    <Input
+                      value={form.esiNumber}
+                      onChange={(e) => setField("esiNumber", e.target.value)}
+                      placeholder="e.g., 4100012345"
+                      className={inputCls}
+                      data-ocid="employees.esic.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <ShieldCheck className="w-3 h-3" />
+                      Aadhaar No
+                    </Label>
+                    <Input
+                      value={form.aadhaarNo}
+                      onChange={(e) => setField("aadhaarNo", e.target.value)}
+                      placeholder="e.g., 1234 5678 9012"
+                      className={inputCls}
+                      data-ocid="employees.aadhar.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">UAN No</Label>
+                    <Input
+                      value={form.uanNo}
+                      onChange={(e) => setField("uanNo", e.target.value)}
+                      placeholder="e.g., 100123456789"
+                      className={inputCls}
+                      data-ocid="employees.uan.input"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">LIC No</Label>
+                    <Input
+                      value={form.licNo}
+                      onChange={(e) => setField("licNo", e.target.value)}
+                      placeholder="e.g., 123456789"
+                      className={inputCls}
+                      data-ocid="employees.lic.input"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            </div>
 
             <DialogFooter className="gap-2 pt-4 mt-2 border-t border-border/40">
               <Button
