@@ -1,10 +1,8 @@
-import { Button } from "@/components/ui/button";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
   BarChart3,
-  Bell,
   BookMarked,
   BookOpen,
   Building2,
@@ -24,6 +22,7 @@ import {
   Moon,
   Package,
   Receipt,
+  RefreshCw,
   Scale,
   Settings,
   Shield,
@@ -37,10 +36,12 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { toast } from "sonner";
 import type { AppSystem, PageName } from "../App";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import type { FeesPage } from "../fees/types";
+import { getSyncStatus, pushAllToBackend } from "../services/backendSync";
 import type { TallyPage } from "../tally/types";
 import SyncIndicator from "./SyncIndicator";
 
@@ -296,11 +297,30 @@ export default function Layout({
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const visibleSalaryItems = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && role !== "admin") return false;
     return true;
   });
+
+  const handleForceSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      await pushAllToBackend();
+      const status = getSyncStatus();
+      if (status === "ok") {
+        toast.success("All data synced to server successfully.");
+      } else {
+        toast.error("Sync failed. Check your connection and try again.");
+      }
+    } catch {
+      toast.error("Sync failed. Check your connection and try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -664,32 +684,19 @@ export default function Layout({
               </AnimatePresence>
             </button>
             <SyncIndicator />
+            {/* Force Sync button — click to manually push all data to server */}
             <button
               type="button"
-              className="w-8 h-8 rounded-lg bg-card/60 border border-border/40 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleForceSync}
+              disabled={syncing}
+              title="Force sync all data to server now"
+              data-ocid="topnav.force_sync.button"
+              className="w-8 h-8 rounded-lg bg-card/60 border border-border/40 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors disabled:opacity-50"
             >
-              <Bell className="w-4 h-4" />
+              <RefreshCw
+                className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`}
+              />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-                <span className="text-xs font-bold text-white uppercase">
-                  {username.slice(0, 2)}
-                </span>
-              </div>
-              <span className="hidden sm:block text-sm font-medium text-foreground/80">
-                {username}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="text-muted-foreground hover:text-destructive text-xs gap-1"
-              data-ocid="topnav.logout.button"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Logout
-            </Button>
           </div>
         </header>
 

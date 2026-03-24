@@ -4,8 +4,6 @@ import {
   Banknote,
   Building2,
   CalendarCheck,
-  ChevronLeft,
-  ChevronRight,
   HardHat,
   Landmark,
   ShieldCheck,
@@ -24,41 +22,22 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
+import {
+  type LocalEmployee,
+  localGetAllEmployees,
+  localGetAllInstitutes,
+} from "../hooks/localStore";
 
-type StoredEmployee = {
-  id: string;
-  name: string;
-  employeeId: string;
-  institute: string;
-  department: string;
-  employmentType: "regular" | "temporary";
-  basicSalary: number;
-};
-
-function getEmployees(): StoredEmployee[] {
-  try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
-  } catch {
-    return [];
-  }
-}
-function getInstitutes() {
-  try {
-    return JSON.parse(localStorage.getItem("institutes") || "[]");
-  } catch {
-    return [];
-  }
-}
 function getAttendance() {
   try {
-    return JSON.parse(localStorage.getItem("attendance") || "[]");
+    return JSON.parse(localStorage.getItem("sms_attendance") || "[]");
   } catch {
     return [];
   }
 }
 function getSalaries() {
   try {
-    return JSON.parse(localStorage.getItem("salaries") || "[]");
+    return JSON.parse(localStorage.getItem("sms_salary") || "[]");
   } catch {
     return [];
   }
@@ -79,7 +58,7 @@ const MONTHS = [
   "December",
 ];
 
-function calcForMonth(employees: StoredEmployee[]) {
+function calcForMonth(employees: LocalEmployee[]) {
   return employees.reduce(
     (acc, emp) => {
       const basic = Number(emp.basicSalary) || 0;
@@ -91,12 +70,10 @@ function calcForMonth(employees: StoredEmployee[]) {
       const pf = Math.round(basic * 0.12);
       const esic = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
       let pt = 0;
-      // Professional Tax: based on annual gross
       const annualGross = gross * 12;
       if (annualGross >= 400000) pt = 208;
       else if (annualGross >= 300000) pt = 167;
       else if (annualGross >= 225000) pt = 125;
-      // Income Tax: new regime slabs
       const annualTaxable = annualGross;
       let annualIT = 0;
       if (annualTaxable > 2400000)
@@ -142,8 +119,8 @@ function fmt(n: number) {
 
 export default function DashboardPage() {
   const { role } = useAuth();
-  const employees = getEmployees();
-  const institutes = getInstitutes();
+  const employees = localGetAllEmployees();
+  const institutes = localGetAllInstitutes();
   const attendance = getAttendance();
   const salaries = getSalaries();
 
@@ -160,15 +137,18 @@ export default function DashboardPage() {
   const prevCalc = calcForMonth(employees);
   const nextCalc = calcForMonth(employees);
 
-  // Count processed salaries this month
+  // month in sms_salary is stored as a number (1-based)
+  const curMonth1 = curMonthIdx + 1;
+  const prevMonth1 = prevMonthIdx + 1;
+
   const processedThisMonth = salaries.filter(
-    (s: { month: string; year: string }) =>
-      s.month === MONTHS[curMonthIdx] && s.year === String(curYear),
+    (s: { month: number; year: number }) =>
+      s.month === curMonth1 && s.year === curYear,
   ).length;
 
   const savedAttendanceThisMonth = attendance.filter(
-    (a: { month: string; year: string }) =>
-      a.month === MONTHS[curMonthIdx] && a.year === String(curYear),
+    (a: { month: number; year: number }) =>
+      a.month === curMonth1 && a.year === curYear,
   ).length;
 
   // Chart data
@@ -182,10 +162,11 @@ export default function DashboardPage() {
     value,
   }));
 
-  const barData = MONTHS.slice(0, curMonthIdx + 1).map((m) => {
+  const barData = MONTHS.slice(0, curMonthIdx + 1).map((m, idx) => {
+    const monthNum = idx + 1;
     const count = salaries.filter(
-      (s: { month: string; year: string }) =>
-        s.month === m && s.year === String(curYear),
+      (s: { month: number; year: number }) =>
+        s.month === monthNum && s.year === curYear,
     ).length;
     return { month: m.slice(0, 3), processed: count, total: employees.length };
   });
@@ -241,6 +222,9 @@ export default function DashboardPage() {
       ...nextCalc,
     },
   ];
+
+  // suppress unused var warning
+  void prevMonth1;
 
   if (role === "employee") {
     return (

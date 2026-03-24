@@ -1,26 +1,39 @@
 // ─── Backend Key-Value Sync Service ─────────────────────────────────────────
-// Syncs localStorage data to/from the ICP canister KV store for cross-device persistence.
+// Uses a custom IDL to call the KV store methods (set/get/remove) which were
+// added to main.mo after the typed bindings were generated.
 
-import { createActorWithConfig } from "../config";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
+import { loadConfig } from "../config";
 
-interface KVStore {
-  set(key: string, value: string): Promise<void>;
-  get(key: string): Promise<string | null>;
-  remove(key: string): Promise<void>;
-  getAll(): Promise<Array<[string, string]>>;
-}
+// Minimal Candid IDL factory for KV store operations
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const kvIdlFactory = ({ IDL }: any) =>
+  IDL.Service({
+    set: IDL.Func([IDL.Text, IDL.Text], [], []),
+    get: IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ["query"]),
+    remove: IDL.Func([IDL.Text], [], []),
+  });
 
-let _kvActor: KVStore | null = null;
+// Keys managed by this sync service
+const SYNC_KEYS = [
+  "sms_institutes",
+  "sms_employees",
+  "sms_attendance",
+  "sms_salary",
+  "sms_daily_workers",
+  "sms_next_institute_id",
+  "sms_next_employee_id",
+  "sms_next_daily_worker_id",
+  "sms_settings",
+  "sms_employee_creds",
+  "tally_transactions",
+  "fees_students",
+  "fees_structures",
+  "fees_payments",
+  "fees_categories",
+];
 
-async function getKVActor(): Promise<KVStore> {
-  if (!_kvActor) {
-    const actor = await createActorWithConfig();
-    _kvActor = actor as unknown as KVStore;
-  }
-  return _kvActor;
-}
-
-// ─── Sync status observable ──────────────────────────────────────────────────
+// ─── Sync status observable ───────────────────────────────────────────────────
 
 type SyncStatus = "idle" | "syncing" | "ok" | "error";
 type StatusListener = (status: SyncStatus) => void;
@@ -39,12 +52,40 @@ export function onSyncStatusChange(fn: StatusListener): () => void {
 
 function setStatus(s: SyncStatus) {
   _status = s;
-  for (const fn of listeners) {
-    fn(s);
-  }
+  for (const fn of listeners) fn(s);
 }
 
-// ─── Retry helper ────────────────────────────────────────────────────────────
+// ─── Actor singleton ──────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _actor: any = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getActor(): Promise<any> {
+  if (!_actor) {
+    const config = await loadConfig();
+    const agent = new HttpAgent({ host: config.backend_host });
+    // Fetch root key for local replica only
+    if (config.backend_host?.includes("localhost")) {
+      try {
+        await agent.fetchRootKey();
+      } catch {
+        // ignore in production
+      }
+    }
+    _actor = Actor.createActor(kvIdlFactory, {
+      agent,
+      canisterId: config.backend_canister_id,
+    });
+  }
+  return _actor;
+}
+
+export function resetActor(): void {
+  _actor = null;
+}
+
+// ─── Retry helper ─────────────────────────────────────────────────────────────
 
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -57,9 +98,8 @@ async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (i < retries - 1) {
+      if (i < retries - 1)
         await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
-      }
     }
   }
   throw lastErr;
@@ -68,15 +108,27 @@ async function withRetry<T>(
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Pull all key-value pairs from the backend canister and write them into localStorage.
- * Call this on app startup to restore data across devices.
+ * Pull all known keys from the backend canister and restore into localStorage.
+ * Called on startup to hydrate data across devices.
  */
 export async function syncFromBackend(): Promise<void> {
   setStatus("syncing");
   try {
-    const kv = await withRetry(() => getKVActor());
-    const entries = await withRetry(() => kv.getAll());
-    for (const [key, value] of entries) {
+    const actor = await withRetry(getActor);
+    const results = await Promise.all(
+      SYNC_KEYS.map(async (key) => {
+        try {
+          const result = await actor.get(key);
+          // Candid opt returns [] for None, [value] for Some
+          const value =
+            Array.isArray(result) && result.length > 0 ? result[0] : null;
+          return { key, value };
+        } catch {
+          return { key, value: null };
+        }
+      }),
+    );
+    for (const { key, value } of results) {
       if (value !== null && value !== undefined) {
         localStorage.setItem(key, value);
       }
@@ -89,12 +141,14 @@ export async function syncFromBackend(): Promise<void> {
 }
 
 /**
- * Write a single key-value pair to the backend canister with retries.
- * Shows sync status indicator while saving.
+ * Write a single key-value pair to the backend canister.
  */
 export function syncKeyToBackend(key: string, value: string): void {
   setStatus("syncing");
-  withRetry(() => getKVActor().then((kv) => kv.set(key, value)))
+  withRetry(async () => {
+    const actor = await getActor();
+    await actor.set(key, value);
+  })
     .then(() => setStatus("ok"))
     .catch((err) => {
       console.warn("[backendSync] set failed after retries:", key, err);
@@ -103,47 +157,32 @@ export function syncKeyToBackend(key: string, value: string): void {
 }
 
 /**
- * Delete a key from the backend canister with retries.
+ * Delete a key from the backend canister.
  */
 export function deleteKeyFromBackend(key: string): void {
-  withRetry(() => getKVActor().then((kv) => kv.remove(key))).catch((err) =>
-    console.warn("[backendSync] remove failed:", key, err),
-  );
+  withRetry(async () => {
+    const actor = await getActor();
+    await actor.remove(key);
+  }).catch((err) => console.warn("[backendSync] remove failed:", key, err));
 }
 
 /**
- * Push ALL localStorage keys to backend. Call after login to ensure
- * any data entered before sync is safely persisted.
+ * Push ALL known localStorage keys to the backend canister.
+ * Call after login to ensure any data entered before sync is persisted.
  */
 export async function pushAllToBackend(): Promise<void> {
   setStatus("syncing");
   try {
-    const kv = await withRetry(() => getKVActor());
-    const SMS_KEYS = [
-      "sms_institutes",
-      "sms_employees",
-      "sms_attendance",
-      "sms_salary",
-      "sms_daily_workers",
-      "sms_next_institute_id",
-      "sms_next_employee_id",
-      "sms_next_daily_worker_id",
-      "sms_settings",
-      "sms_employee_creds",
-      "tally_transactions",
-      "fees_students",
-      "fees_structures",
-      "fees_payments",
-      "fees_categories",
-    ];
-    const pushPromises: Promise<void>[] = [];
-    for (const key of SMS_KEYS) {
-      const val = localStorage.getItem(key);
-      if (val !== null) {
-        pushPromises.push(withRetry(() => kv.set(key, val)));
-      }
-    }
-    await Promise.all(pushPromises);
+    resetActor();
+    const actor = await withRetry(getActor);
+    await Promise.all(
+      SYNC_KEYS.map(async (key) => {
+        const val = localStorage.getItem(key);
+        if (val !== null) {
+          await withRetry(() => actor.set(key, val));
+        }
+      }),
+    );
     setStatus("ok");
   } catch (err) {
     console.warn("[backendSync] pushAllToBackend failed:", err);
