@@ -55,9 +55,29 @@ const YEARS = Array.from({ length: CURRENT_YEAR - 2000 }, (_, i) =>
   String(CURRENT_YEAR - i),
 );
 
+function getCurrentSessionYear() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  if (m >= 3) return `${y}-${(y + 1).toString().slice(2)}`;
+  return `${y - 1}-${y.toString().slice(2)}`;
+}
+
+const SESSION_YEAR_LIST = (() => {
+  const now = new Date();
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth();
+  const latestStartYear = currentM >= 3 ? currentY : currentY - 1;
+  const result: string[] = [];
+  for (let y = latestStartYear; y >= 2001; y--) {
+    result.push(`${y}-${(y + 1).toString().slice(2)}`);
+  }
+  return result;
+})();
+
 function getSessionMonthNames(): string[] {
   const now = new Date();
-  const currentMonthIdx = now.getMonth(); // 0-based
+  const currentMonthIdx = now.getMonth();
   const result: string[] = [];
   if (currentMonthIdx >= 3) {
     for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
@@ -83,13 +103,30 @@ type StoredEmployee = {
   pan?: string;
   pfAccount?: string;
   esicNo?: string;
+  doj?: string;
+  promotionHistory?: Array<{
+    date?: string;
+    action?: string;
+    toInstitute?: string;
+    remarks?: string;
+    designation?: string;
+  }>;
+  extra?: {
+    designation?: string;
+    dob?: string;
+    doj?: string;
+    bankAccount?: string;
+    pfAccount?: string;
+    esicNo?: string;
+    pan?: string;
+    uan?: string;
+  };
 };
 
 type StoredSalary = {
   employeeId: string;
   month: string;
   year: string;
-  // Fields from ReportsPage calcSalaryComponents (fallback)
   basic?: number;
   da?: number;
   hra?: number;
@@ -100,7 +137,6 @@ type StoredSalary = {
   pt?: number;
   it?: number;
   net?: number;
-  // Fields from SalaryProcessingPage (saved records)
   basicPay?: number;
   specialPay?: number;
   daPercent?: number;
@@ -209,7 +245,7 @@ const REPORT_CATEGORIES = [
         id: "salary-register",
         label: "Salary Register",
         icon: <ClipboardList className="w-4 h-4" />,
-        desc: "Detailed salary register with all components",
+        desc: "Annual per-employee salary register with all components",
       },
       {
         id: "bank-statement",
@@ -265,6 +301,12 @@ const REPORT_CATEGORIES = [
         label: "Loan Recovery Report",
         icon: <Receipt className="w-4 h-4" />,
         desc: "PF loan/advance recovery tracking",
+      },
+      {
+        id: "pf-register",
+        label: "PF Register",
+        icon: <FileBarChart2 className="w-4 h-4" />,
+        desc: "Institute-wise PF contribution remittance register",
       },
     ],
   },
@@ -371,13 +413,11 @@ function calcSalaryComponents(emp: StoredEmployee) {
   const gross = basic + da + hra + ta;
   const pf = Math.round(basic * 0.12);
   const esic = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
-  // Professional Tax: based on annual gross salary
   const annualGross = gross * 12;
   let pt = 0;
   if (annualGross >= 400000) pt = 208;
   else if (annualGross >= 300000) pt = 167;
   else if (annualGross >= 225000) pt = 125;
-  // Income Tax: new regime slabs
   const annualTaxable = annualGross;
   let annualIT = 0;
   if (annualTaxable > 2400000)
@@ -401,11 +441,60 @@ function fmt(n: number) {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 }
 
+function fmtCell(n: number): string {
+  if (!n) return "";
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
+
+function parseDateStr(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const m = dateStr.match(/(\d{1,2})-([A-Za-z]{3}),?(\d{4})/);
+  if (m) {
+    const monthMap: Record<string, number> = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
+    const mo = monthMap[m[2].toLowerCase()];
+    if (mo !== undefined)
+      return new Date(Number.parseInt(m[3]), mo, Number.parseInt(m[1]));
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!Number.isNaN(d.getTime())) return d;
+  } catch {}
+  return null;
+}
+
+function getSalVal(
+  key: string,
+  altKey: string | undefined,
+  sal: StoredSalary | null,
+): number {
+  if (!sal) return 0;
+  const s = sal as Record<string, unknown>;
+  if (typeof s[key] === "number") return s[key] as number;
+  if (altKey && typeof s[altKey] === "number") return s[altKey] as number;
+  return 0;
+}
+
 export default function ReportsPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [selectedInstitute, setSelectedInstitute] = useState("all");
+  const [selectedSessionYear, setSelectedSessionYear] = useState(
+    getCurrentSessionYear(),
+  );
   const [activeCategory, setActiveCategory] = useState("payroll");
   const [generating, setGenerating] = useState<string | null>(null);
 
@@ -462,6 +551,20 @@ export default function ReportsPage() {
   }
 
   function buildReportHTML(reportId: string, reportLabel: string) {
+    if (reportId === "paybill") {
+      return buildPaybillHTML(selectedMonth, selectedYear, selectedInstitute);
+    }
+    if (reportId === "salary-register") {
+      return buildSalaryRegisterHTML(selectedInstitute, selectedSessionYear);
+    }
+    if (reportId === "pf-register") {
+      return buildPFRegisterHTML(
+        selectedMonth,
+        selectedYear,
+        selectedInstitute,
+      );
+    }
+
     const headerRows = salaryRows
       .map(
         (r) => `
@@ -470,16 +573,16 @@ export default function ReportsPage() {
           <td>${r.emp.employeeId}</td>
           <td>${r.emp.designation || "-"}</td>
           <td>${r.emp.employmentType === "regular" ? "Regular" : "Temporary"}</td>
-          <td>₹${fmt(r.basic || 0)}</td>
-          <td>₹${fmt(r.da || 0)}</td>
-          <td>₹${fmt(r.hra || 0)}</td>
-          <td>₹${fmt(r.ta || 0)}</td>
-          <td>₹${fmt(r.gross || 0)}</td>
-          <td>₹${fmt(r.pf || 0)}</td>
-          <td>₹${fmt(r.esic || 0)}</td>
-          <td>₹${fmt(r.pt || 0)}</td>
-          <td>₹${fmt(r.it || 0)}</td>
-          <td><strong>₹${fmt(r.net || 0)}</strong></td>
+          <td>&#8377;${fmt(r.basic || 0)}</td>
+          <td>&#8377;${fmt(r.da || 0)}</td>
+          <td>&#8377;${fmt(r.hra || 0)}</td>
+          <td>&#8377;${fmt(r.ta || 0)}</td>
+          <td>&#8377;${fmt(r.gross || 0)}</td>
+          <td>&#8377;${fmt(r.pf || 0)}</td>
+          <td>&#8377;${fmt(r.esic || 0)}</td>
+          <td>&#8377;${fmt(r.pt || 0)}</td>
+          <td>&#8377;${fmt(r.it || 0)}</td>
+          <td><strong>&#8377;${fmt(r.net || 0)}</strong></td>
         </tr>`,
       )
       .join("");
@@ -493,7 +596,7 @@ export default function ReportsPage() {
           <td>${r.emp.bankAccount || "-"}</td>
           <td>${r.emp.bankName || "-"}</td>
           <td>${r.emp.ifsc || "-"}</td>
-          <td><strong>₹${fmt(r.net || 0)}</strong></td>
+          <td><strong>&#8377;${fmt(r.net || 0)}</strong></td>
         </tr>`,
       )
       .join("");
@@ -505,10 +608,10 @@ export default function ReportsPage() {
           <td>${r.emp.name}</td>
           <td>${r.emp.employeeId}</td>
           <td>${r.emp.pfAccount || "-"}</td>
-          <td>₹${fmt(r.basic || 0)}</td>
-          <td>₹${fmt(r.pf || 0)}</td>
-          <td>₹${fmt(r.pf || 0)}</td>
-          <td>₹${fmt((r.pf || 0) * 2)}</td>
+          <td>&#8377;${fmt(r.basic || 0)}</td>
+          <td>&#8377;${fmt(r.pf || 0)}</td>
+          <td>&#8377;${fmt(r.pf || 0)}</td>
+          <td>&#8377;${fmt((r.pf || 0) * 2)}</td>
         </tr>`,
       )
       .join("");
@@ -519,10 +622,10 @@ export default function ReportsPage() {
         <tr>
           <td>${r.emp.name}</td>
           <td>${r.emp.esicNo || "-"}</td>
-          <td>₹${fmt(r.gross || 0)}</td>
-          <td>₹${fmt(r.esic || 0)}</td>
-          <td>₹${fmt(Math.round((r.gross || 0) * 0.0325))}</td>
-          <td>₹${fmt(Math.round((r.gross || 0) * 0.04))}</td>
+          <td>&#8377;${fmt(r.gross || 0)}</td>
+          <td>&#8377;${fmt(r.esic || 0)}</td>
+          <td>&#8377;${fmt(Math.round((r.gross || 0) * 0.0325))}</td>
+          <td>&#8377;${fmt(Math.round((r.gross || 0) * 0.04))}</td>
         </tr>`,
       )
       .join("");
@@ -561,10 +664,10 @@ export default function ReportsPage() {
         <tr>
           <td>${r.emp.name}</td>
           <td>${r.emp.pan || "-"}</td>
-          <td>₹${fmt((r.gross || 0) * 12)}</td>
-          <td>₹75,000.00</td>
-          <td>₹${fmt(Math.max(0, (r.gross || 0) * 12 - 75000))}</td>
-          <td>₹${fmt((r.it || 0) * 12)}</td>
+          <td>&#8377;${fmt((r.gross || 0) * 12)}</td>
+          <td>&#8377;75,000.00</td>
+          <td>&#8377;${fmt(Math.max(0, (r.gross || 0) * 12 - 75000))}</td>
+          <td>&#8377;${fmt((r.it || 0) * 12)}</td>
         </tr>`,
         )
         .join("");
@@ -580,32 +683,24 @@ export default function ReportsPage() {
           const ag = g * 12;
           const slab =
             ag >= 400000
-              ? "₹4,00,000 & above (annual)"
+              ? "&#8377;4,00,000 & above (annual)"
               : ag >= 300000
-                ? "₹3,00,000 – ₹3,99,999 (annual)"
+                ? "&#8377;3,00,000 \u2013 &#8377;3,99,999 (annual)"
                 : ag >= 225000
-                  ? "₹2,25,000 – ₹2,99,999 (annual)"
-                  : "Below ₹2,25,000 (annual)";
-          return `<tr><td>${r.emp.name}</td><td>${r.emp.employeeId}</td><td>₹${fmt(g)}</td><td>${slab}</td><td>₹${fmt(r.pt || 0)}</td></tr>`;
+                  ? "&#8377;2,25,000 \u2013 &#8377;2,99,999 (annual)"
+                  : "Below &#8377;2,25,000 (annual)";
+          return `<tr><td>${r.emp.name}</td><td>${r.emp.employeeId}</td><td>&#8377;${fmt(g)}</td><td>${slab}</td><td>&#8377;${fmt(r.pt || 0)}</td></tr>`;
         })
         .join("");
       tableHTML =
         ptRows ||
         `<tr><td colspan="5" style="text-align:center">No data found</td></tr>`;
-    } else if (reportId === "paybill") {
-      // Paybill handled separately below
-      tableHeader = "";
-      tableHTML = "";
     } else {
       tableHeader =
         "<tr><th>Name</th><th>Emp ID</th><th>Designation</th><th>Type</th><th>Basic</th><th>DA</th><th>HRA</th><th>TA</th><th>Gross</th><th>PF</th><th>ESIC</th><th>PT</th><th>IT</th><th>Net Pay</th></tr>";
       tableHTML =
         headerRows ||
         `<tr><td colspan="14" style="text-align:center">No data found</td></tr>`;
-    }
-
-    if (reportId === "paybill") {
-      return buildPaybillHTML(selectedMonth, selectedYear, selectedInstitute);
     }
 
     return `<!DOCTYPE html>
@@ -630,7 +725,7 @@ export default function ReportsPage() {
 <div class="header">
   <img src="${LOGO_URL}" alt="Logo" class="logo" />
   <div style="text-align:center">
-    <h2>Yf's Platform — Salary Management System</h2>
+    <h2>Yf's Platform \u2014 Salary Management System</h2>
     <h3>${reportLabel} | ${selectedInstitute === "all" ? "All Institutes" : selectedInstitute} | ${selectedMonth} ${selectedYear}</h3>
   </div>
 </div>
@@ -638,14 +733,724 @@ export default function ReportsPage() {
   <thead>${tableHeader}</thead>
   <tbody>
     ${tableHTML}
-    ${reportId === "salary-register" ? `<tr class="totals"><td colspan="8" style="text-align:right">TOTALS →</td><td>₹${fmt(totals.gross)}</td><td>₹${fmt(totals.pf)}</td><td>₹${fmt(totals.esic)}</td><td>₹${fmt(totals.pt)}</td><td>₹${fmt(totals.it)}</td><td>₹${fmt(totals.net)}</td></tr>` : ""}
   </tbody>
 </table>
 <div class="footer">
-  Generated on ${formatToday()} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
+  Generated on ${formatToday()} | &#169; 2026 Yf's Platform \u2014 Salary Management System
 </div>
 </body></html>`;
   }
+
+  // ─── SALARY REGISTER (Annual per-employee format) ───────────────────────────
+  function buildSalaryRegisterHTML(
+    institute: string,
+    sessionYear: string,
+  ): string {
+    const year1 = Number.parseInt(sessionYear.split("-")[0]);
+    const year2 = year1 + 1;
+
+    const SESSION_MONTHS = [
+      {
+        label: `Apr-${String(year1).slice(2)}`,
+        month: "April",
+        year: String(year1),
+      },
+      {
+        label: `May-${String(year1).slice(2)}`,
+        month: "May",
+        year: String(year1),
+      },
+      {
+        label: `Jun-${String(year1).slice(2)}`,
+        month: "June",
+        year: String(year1),
+      },
+      {
+        label: `Jul-${String(year1).slice(2)}`,
+        month: "July",
+        year: String(year1),
+      },
+      {
+        label: `Aug-${String(year1).slice(2)}`,
+        month: "August",
+        year: String(year1),
+      },
+      {
+        label: `Sep-${String(year1).slice(2)}`,
+        month: "September",
+        year: String(year1),
+      },
+      {
+        label: `Oct-${String(year1).slice(2)}`,
+        month: "October",
+        year: String(year1),
+      },
+      {
+        label: `Nov-${String(year1).slice(2)}`,
+        month: "November",
+        year: String(year1),
+      },
+      {
+        label: `Dec-${String(year1).slice(2)}`,
+        month: "December",
+        year: String(year1),
+      },
+      {
+        label: `Jan-${String(year2).slice(2)}`,
+        month: "January",
+        year: String(year2),
+      },
+      {
+        label: `Feb-${String(year2).slice(2)}`,
+        month: "February",
+        year: String(year2),
+      },
+      {
+        label: `Mar-${String(year2).slice(2)}`,
+        month: "March",
+        year: String(year2),
+      },
+    ];
+
+    const orgName =
+      institute === "all"
+        ? "Yf's Platform \u2014 Salary Management"
+        : institute;
+    const empList = getEmployees().filter(
+      (e) => institute === "all" || e.institute === institute,
+    );
+    const allSalaries = getSalaries();
+
+    // Earnings row definitions: key, altKey, label, isLwp
+    const EARNINGS: {
+      key: string;
+      altKey?: string;
+      label: string;
+      isLwp?: boolean;
+    }[] = [
+      { key: "basicPay", altKey: "basic", label: "Basic Pay" },
+      { key: "lwp", label: "LWP (Days)", isLwp: true },
+      { key: "specialPay", label: "Special Pay" },
+      { key: "da", label: "D.A." },
+      { key: "hra", label: "H.R.A.@00%" },
+      { key: "bonus", label: "Bonus" },
+      { key: "daArrears", label: "D.A. Arrears" },
+      { key: "conveyanceAllowance", label: "Conveyance Allowance" },
+      { key: "washingAllowance", label: "Washing Allowance" },
+      { key: "ltc", label: "LTC Adv./Claim" },
+      { key: "festivalAdvance", label: "Festival Advance" },
+      { key: "incentive", label: "Incentive" },
+      { key: "otherEarnings", label: "Other Earnings" },
+    ];
+
+    const DEDUCTIONS: { key: string; altKey?: string; label: string }[] = [
+      { key: "houseRent", label: "House Rent" },
+      { key: "electricityCharges", label: "Electricity Charge" },
+      { key: "lwf", label: "Labour Welfare Fund" },
+      { key: "epf", altKey: "pf", label: "E.P.F.@12%" },
+      { key: "vpf", label: "V.P.F.@00%" },
+      { key: "lic", label: "L.I.C." },
+      { key: "profTax", altKey: "pt", label: "P. Tax" },
+      { key: "incomeTax", altKey: "it", label: "Income Tax" },
+      { key: "festival", label: "Festival Advance" },
+      { key: "esi", altKey: "esic", label: "ESI@.75%" },
+      { key: "security", label: "Security Deposit" },
+      { key: "otherDeductions", label: "Other Deductions" },
+    ];
+
+    // Total rows for remarks rowspan: earnings(13) + gross(1) + deductions(12) + total ded(1) + net(1) = 28
+    const TOTAL_ROW_COUNT = EARNINGS.length + 1 + DEDUCTIONS.length + 1 + 1;
+
+    const empSections = empList.map((emp) => {
+      // Build monthly salary map
+      const monthlySal: Record<string, StoredSalary | null> = {};
+      for (const sm of SESSION_MONTHS) {
+        monthlySal[sm.label] =
+          allSalaries.find(
+            (s) =>
+              s.employeeId === emp.employeeId &&
+              s.month === sm.month &&
+              s.year === sm.year,
+          ) || null;
+      }
+
+      // Detect status events from promotionHistory
+      const eventMonths = new Set<string>();
+      const eventText: Record<string, string> = {};
+      const ph = emp.promotionHistory || [];
+      for (const entry of ph) {
+        const d = parseDateStr(entry.date || "");
+        if (!d) continue;
+        const mIdx = d.getMonth(); // 0-based
+        const yr = d.getFullYear();
+        const sm = SESSION_MONTHS.find(
+          (m) => MONTHS.indexOf(m.month) === mIdx && m.year === String(yr),
+        );
+        if (sm) {
+          eventMonths.add(sm.label);
+          const action = (entry.action || "EVENT").toUpperCase();
+          let text = action;
+          if (entry.toInstitute) text += ` TO ${entry.toInstitute}`;
+          text += ` ${sm.label}`;
+          eventText[sm.label] = text;
+        }
+      }
+
+      // Build remarks
+      const remarksLines: string[] = [];
+      const empAny = emp as StoredEmployee & { extra?: { doj?: string } };
+      const dojVal = empAny.doj || empAny.extra?.doj || "";
+      if (dojVal) remarksLines.push(`Joined on: ${dojVal}`);
+      for (const entry of ph) {
+        if (entry.action && entry.date) {
+          remarksLines.push(`${entry.action}: ${entry.date}`);
+        }
+        if (entry.remarks) remarksLines.push(entry.remarks);
+      }
+      const remarksHtml = remarksLines.length
+        ? remarksLines.join("<br>")
+        : "&mdash;";
+
+      // Track which event months have had their spanning cell added
+      const eventCellsAdded = new Set<string>();
+
+      // Build a data row for the salary table
+      function buildDataRow(
+        key: string,
+        altKey: string | undefined,
+        label: string,
+        isLwp: boolean,
+        isFirstRow: boolean,
+        applyEventSpan: boolean,
+        rowStyle: string,
+        labelStyle: string,
+      ): string {
+        let cells = "";
+        let rowTotal = 0;
+
+        for (const sm of SESSION_MONTHS) {
+          const ml = sm.label;
+          const sal = monthlySal[ml];
+
+          if (applyEventSpan && eventMonths.has(ml)) {
+            if (!eventCellsAdded.has(ml)) {
+              // First row encountering this event month — add spanning cell
+              cells += `<td colspan="2" rowspan="${EARNINGS.length}" style="writing-mode:vertical-lr;transform:rotate(180deg);text-align:center;vertical-align:middle;background:#fed7d7;color:#c53030;font-weight:bold;font-size:6.5px;padding:2px;border:1px solid #fca5a5;line-height:1.2">${eventText[ml]}</td>`;
+              eventCellsAdded.add(ml);
+            }
+            // else: skip — covered by rowspan
+          } else {
+            if (isLwp) {
+              // LWP row: show lwp days + computed deduction below
+              const lwpDays = sal ? sal.lwp || 0 : 0;
+              const basicVal = sal ? getSalVal("basicPay", "basic", sal) : 0;
+              const lwpDed =
+                lwpDays > 0 ? Math.round((basicVal * lwpDays) / 30) : 0;
+              rowTotal += lwpDed;
+              cells += `<td class="num" style="font-size:6.5px">${lwpDed ? `(${fmtCell(lwpDed)})` : ""}<br><span style="font-size:5.5px;color:#666">${lwpDays > 0 ? `${lwpDays}d` : ""}</span></td><td class="tc">-</td>`;
+            } else {
+              const val = getSalVal(key, altKey, sal);
+              rowTotal += val;
+              cells += `<td class="num">${fmtCell(val)}</td><td class="tc">00</td>`;
+            }
+          }
+        }
+
+        cells += `<td class="num" style="${rowStyle}">${isLwp ? (rowTotal ? `(${fmtCell(rowTotal)})` : "") : fmtCell(rowTotal)}</td>`;
+
+        if (isFirstRow) {
+          cells += `<td rowspan="${TOTAL_ROW_COUNT}" class="remarks">${remarksHtml}</td>`;
+        }
+
+        return `<tr><td class="particular" style="${labelStyle}">${label}</td>${cells}</tr>`;
+      }
+
+      // Build a summary row (GROSS EARNING / TOTAL DEDUCTION / NET PAYABLE)
+      function buildSummaryRow(
+        key: string,
+        altKey: string | undefined,
+        label: string,
+        bg: string,
+      ): string {
+        let cells = "";
+        let total = 0;
+        for (const sm of SESSION_MONTHS) {
+          const val = getSalVal(key, altKey, monthlySal[sm.label]);
+          total += val;
+          cells += `<td class="num" style="font-weight:bold;background:${bg}">${fmtCell(val)}</td><td class="tc" style="background:${bg}">00</td>`;
+        }
+        cells += `<td class="num" style="font-weight:bold;background:${bg}">${fmtCell(total)}</td>`;
+        return `<tr><td class="particular" style="font-weight:bold;background:${bg}">${label}</td>${cells}</tr>`;
+      }
+
+      // ── Build all rows ──
+      let rowsHtml = "";
+
+      // Earnings rows (with event spanning)
+      for (let idx = 0; idx < EARNINGS.length; idx++) {
+        const row = EARNINGS[idx];
+        rowsHtml += buildDataRow(
+          row.key,
+          row.altKey,
+          row.label,
+          row.isLwp || false,
+          idx === 0, // addRemarks on first row
+          true, // applyEventSpan
+          "",
+          "",
+        );
+      }
+
+      // GROSS EARNING
+      rowsHtml += buildSummaryRow(
+        "grossEarnings",
+        "gross",
+        "GROSS EARNING",
+        "#c6f6d5",
+      );
+
+      // Deductions rows (no event spanning)
+      for (const row of DEDUCTIONS) {
+        rowsHtml += buildDataRow(
+          row.key,
+          row.altKey,
+          row.label,
+          false,
+          false,
+          false, // no event span
+          "",
+          "",
+        );
+      }
+
+      // TOTAL DEDUCTION
+      rowsHtml += buildSummaryRow(
+        "totalDeductions",
+        undefined,
+        "TOTAL DEDUCTION",
+        "#fefcbf",
+      );
+
+      // NET PAYABLE
+      rowsHtml += buildSummaryRow(
+        "netEarnings",
+        "net",
+        "NET PAYABLE",
+        "#bee3f8",
+      );
+
+      // Employee header info
+      const designation =
+        (emp as any).extra?.designation || emp.designation || "-";
+      const bankAcc = emp.bankAccount || (emp as any).extra?.bankAccount || "-";
+      const pfAcc = emp.pfAccount || (emp as any).extra?.pfAccount || "-";
+      const esicNo = emp.esicNo || (emp as any).extra?.esicNo || "-";
+
+      // Month header row
+      const monthHeaders = SESSION_MONTHS.map((sm) => {
+        const hasEvent = eventMonths.has(sm.label);
+        return `<th colspan="2" style="${hasEvent ? "background:#c53030;" : ""}">${sm.label}</th>`;
+      }).join("");
+
+      const monthSubHeaders = SESSION_MONTHS.map(
+        () => "<th>Rs.</th><th>P.</th>",
+      ).join("");
+
+      return `
+<div class="emp-section">
+  <table class="header-table">
+    <tr>
+      <td class="emp-info-cell">
+        <strong>${emp.name}</strong><br>
+        Staff No: ${emp.employeeId}&nbsp;&nbsp;|&nbsp;&nbsp;Inst: ${emp.institute || "-"}<br>
+        Designation: ${designation}<br>
+        Scale of Pay: ${emp.basicSalary ? `Rs. ${emp.basicSalary}/-` : "-"}<br>
+        D.O.J.: ${dojVal || "-"}
+      </td>
+      <td class="title-cell">
+        <div class="org-name">${orgName}</div>
+        <div class="pay-year">PAY FOR THE YEAR ${sessionYear}</div>
+      </td>
+      <td class="bank-info-cell">
+        Bank A/c No: ${bankAcc}<br>
+        PF A/c No: ${pfAcc}<br>
+        ESIC No: ${esicNo}<br>
+        PAN: ${emp.pan || (emp as any).extra?.pan || "-"}
+      </td>
+    </tr>
+  </table>
+
+  <div style="overflow-x:auto">
+  <table class="salary-table">
+    <thead>
+      <tr>
+        <th rowspan="2" class="particular-header">PARTICULARS</th>
+        ${monthHeaders}
+        <th rowspan="2" style="min-width:55px">TOTAL<br>Rs.</th>
+        <th rowspan="2" style="min-width:90px">Remarks</th>
+      </tr>
+      <tr>${monthSubHeaders}</tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+  </div>
+
+  <table class="sig-table">
+    <tr>
+      <td>Prepared by</td>
+      <td>Account Assistant</td>
+      <td>Section Officer</td>
+      <td>Secretary / Treasurer</td>
+    </tr>
+  </table>
+</div>`;
+    });
+
+    return `<!DOCTYPE html>
+<html><head><title>Salary Register ${sessionYear}</title>
+<style>
+  @page { size: landscape; margin: 8mm; }
+  body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; color: #222; }
+  .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-35deg); opacity: 0.04; z-index: 0; pointer-events: none; }
+  .watermark img { width: 300px; }
+  .emp-section { page-break-after: always; margin-bottom: 16px; }
+
+  /* Header table */
+  .header-table { width: 100%; border-collapse: collapse; margin-bottom: 3px; border: 1px solid #aaa; font-size: 8px; }
+  .header-table td { padding: 4px 6px; vertical-align: top; }
+  .emp-info-cell { width: 33%; border-right: 1px solid #aaa; }
+  .title-cell { width: 34%; text-align: center; padding: 6px; }
+  .bank-info-cell { width: 33%; border-left: 1px solid #aaa; }
+  .org-name { font-size: 11px; font-weight: bold; color: #1a365d; }
+  .pay-year { font-size: 9px; color: #2d3748; margin-top: 3px; font-weight: 600; }
+
+  /* Salary table */
+  .salary-table { width: 100%; border-collapse: collapse; font-size: 7px; }
+  .salary-table thead th { background: #1a365d; color: #fff; text-align: center; padding: 2px 1px; border: 1px solid #2c5282; font-size: 6.5px; }
+  .salary-table tbody td { padding: 1px 2px; border: 1px solid #e2e8f0; vertical-align: middle; }
+  .salary-table tbody tr:nth-child(even) td:not([rowspan]) { background: #f7fafc; }
+  .particular { min-width: 90px; font-size: 7px; padding: 1px 3px; white-space: nowrap; }
+  .particular-header { min-width: 95px; }
+  .num { text-align: right; font-size: 7px; white-space: nowrap; min-width: 38px; }
+  .tc { text-align: center; font-size: 7px; width: 12px; color: #888; }
+  .remarks { vertical-align: top; font-size: 6.5px; min-width: 85px; padding: 2px 3px; line-height: 1.4; }
+
+  /* Signature */
+  .sig-table { width: 100%; margin-top: 10px; border-collapse: collapse; }
+  .sig-table td { text-align: center; padding-top: 20px; border-top: 1px solid #555; width: 25%; font-size: 8px; font-weight: 600; color: #2d3748; }
+
+  /* Footer */
+  .footer { margin-top: 8px; font-size: 7px; color: #888; text-align: center; border-top: 1px solid #ddd; padding-top: 4px; }
+
+  @media print { body { margin: 0; } .no-print { display: none; } }
+</style>
+</head><body>
+<div class="watermark"><img src="${LOGO_URL}" alt="" /></div>
+${empSections.length ? empSections.join("\n") : `<p style="text-align:center;padding:40px;font-size:14px">No employees found for ${institute === "all" ? "All Institutes" : institute} in ${sessionYear}</p>`}
+<div class="footer">
+  Generated on ${formatToday()} | &copy; ${new Date().getFullYear()} Yf's Platform \u2014 Salary Management System
+</div>
+</body></html>`;
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ─── PF REGISTER (Institute-wise remittance) ────────────────────────────────
+  function buildPFRegisterHTML(
+    month: string,
+    year: string,
+    institute: string,
+  ): string {
+    const allEmps = getEmployees();
+    const allSalaries = getSalaries();
+    const allInstitutes = getInstitutes();
+
+    // Build institute list to show
+    const instList = institute === "all" ? allInstitutes : [institute];
+
+    type InstRow = {
+      name: string;
+      displayName: string;
+      salary: number;
+      empContrib: number;
+      emplrContrib: number;
+      pension: number;
+      vpf: number;
+      adminCharges: number;
+      total: number;
+    };
+
+    const allInstData: { name: string; shortCode: string }[] = (() => {
+      try {
+        const raw = JSON.parse(localStorage.getItem("institutes") || "[]");
+        return raw;
+      } catch {
+        return [];
+      }
+    })();
+
+    const rows: InstRow[] = instList.map((inst) => {
+      const instData = allInstData.find((i) => i.name === inst);
+      const displayName = instData?.shortCode || inst;
+      const emps = allEmps.filter((e) => e.institute === inst);
+      let salary = 0;
+      let empContrib = 0;
+      let emplrContrib = 0;
+      let pension = 0;
+      let vpf = 0;
+      for (const emp of emps) {
+        const saved = allSalaries.find(
+          (s) =>
+            s.employeeId === emp.employeeId &&
+            s.month === month &&
+            s.year === year,
+        );
+        const basic = saved
+          ? Number(saved.basic) || 0
+          : Number(emp.basicSalary) || 0;
+        const da = saved
+          ? Number(saved.da) || 0
+          : emp.employmentType === "regular"
+            ? Math.round(basic * 2.57)
+            : 0;
+        const sp = saved ? Number((saved as any).specialPay) || 0 : 0;
+        const daArr = saved ? Number((saved as any).daArrears) || 0 : 0;
+        const salAmt = basic + sp + da + daArr;
+        salary += salAmt;
+        // Employee PF @12%
+        const ePF = Math.round(basic * 0.12);
+        empContrib += ePF;
+        // Employer: pension @8.33% of basic, employer diff @3.67%
+        const pen = Math.round(basic * 0.0833);
+        const emplr = Math.round(basic * 0.0367);
+        pension += pen;
+        emplrContrib += emplr;
+        // VPF from saved data
+        vpf += saved ? Number((saved as any).vpf) || 0 : 0;
+      }
+      const adminCharges = Math.round(salary * 0.005);
+      const total = empContrib + emplrContrib + pension + vpf + adminCharges;
+      return {
+        name: inst,
+        displayName,
+        salary,
+        empContrib,
+        emplrContrib,
+        pension,
+        vpf,
+        adminCharges,
+        total,
+      };
+    });
+
+    const T = rows.reduce(
+      (a, r) => ({
+        name: "TOTAL",
+        salary: a.salary + r.salary,
+        empContrib: a.empContrib + r.empContrib,
+        emplrContrib: a.emplrContrib + r.emplrContrib,
+        pension: a.pension + r.pension,
+        vpf: a.vpf + r.vpf,
+        adminCharges: a.adminCharges + r.adminCharges,
+        total: a.total + r.total,
+      }),
+      {
+        name: "",
+        salary: 0,
+        empContrib: 0,
+        emplrContrib: 0,
+        pension: 0,
+        vpf: 0,
+        adminCharges: 0,
+        total: 0,
+      },
+    );
+
+    // A/c No. breakdown: 01 = emp+emplr+pension, 02 = admin, 10 = pension
+    const acct01 = T.empContrib + T.emplrContrib;
+    const acct02 = T.adminCharges;
+    const acct10 = T.pension;
+
+    function fmtPaise(n: number) {
+      const rupees = Math.floor(n).toLocaleString("en-IN");
+      return `<td class="num">${rupees}</td><td class="paise">00</td>`;
+    }
+
+    const rowsHTML = rows
+      .map(
+        (r, i) => `<tr>
+          <td class="sl">${i + 1}</td>
+          <td class="name">${r.displayName}</td>
+          ${fmtPaise(r.salary)}
+          ${fmtPaise(r.empContrib)}
+          ${fmtPaise(r.emplrContrib)}
+          ${fmtPaise(r.pension)}
+          ${r.vpf ? fmtPaise(r.vpf) : '<td class="num"></td><td class="paise"></td>'}
+          ${fmtPaise(r.adminCharges)}
+          <td class="num total-col" style="color:#c00;">${Math.floor(r.total).toLocaleString("en-IN")}</td><td class="paise" style="color:#c00;">00</td>
+          <td></td>
+        </tr>`,
+      )
+      .join("");
+
+    const orgName =
+      institute === "all" ? "Yf's Platform — Salary Management" : institute;
+    const monthYear = `${month.substring(0, 3)}-${year.slice(2)}`;
+
+    // Amount in words (basic)
+    function numToWords(n: number): string {
+      if (n === 0) return "Zero";
+      const ones = [
+        "",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+        "Ten",
+        "Eleven",
+        "Twelve",
+        "Thirteen",
+        "Fourteen",
+        "Fifteen",
+        "Sixteen",
+        "Seventeen",
+        "Eighteen",
+        "Nineteen",
+      ];
+      const tens = [
+        "",
+        "",
+        "Twenty",
+        "Thirty",
+        "Forty",
+        "Fifty",
+        "Sixty",
+        "Seventy",
+        "Eighty",
+        "Ninety",
+      ];
+      function convert(num: number): string {
+        if (num < 20) return ones[num];
+        if (num < 100)
+          return (
+            tens[Math.floor(num / 10)] + (num % 10 ? ` ${ones[num % 10]}` : "")
+          );
+        if (num < 1000)
+          return `${ones[Math.floor(num / 100)]} Hundred${num % 100 ? ` ${convert(num % 100)}` : ""}`;
+        if (num < 100000)
+          return `${convert(Math.floor(num / 1000))} Thousand${num % 1000 ? ` ${convert(num % 1000)}` : ""}`;
+        if (num < 10000000)
+          return `${convert(Math.floor(num / 100000))} Lakh${num % 100000 ? ` ${convert(num % 100000)}` : ""}`;
+        return `${convert(Math.floor(num / 10000000))} Crore${num % 10000000 ? ` ${convert(num % 10000000)}` : ""}`;
+      }
+      return convert(Math.floor(n));
+    }
+
+    const amtWords = numToWords(T.total);
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>PF Register - ${monthYear}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 20px; }
+  h2 { text-align: center; font-size: 18px; font-weight: bold; margin: 0 0 4px; }
+  h3 { text-align: center; font-size: 12px; font-weight: normal; margin: 0 0 4px; }
+  .title-line { text-align: center; font-size: 13px; font-weight: bold; margin: 12px 0 8px; }
+  .month-red { color: #c00; font-size: 15px; font-weight: bold; }
+  table.main { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  table.main th, table.main td { border: 1px solid #222; padding: 3px 5px; }
+  table.main th { text-align: center; font-size: 10px; background: #f5f5f5; }
+  td.sl { text-align: center; }
+  td.name { }
+  td.num { text-align: right; border-right: none !important; padding-right: 2px; }
+  td.paise { text-align: left; border-left: none !important; padding-left: 2px; min-width: 18px; }
+  td.total-col { text-align: right; border-right: none !important; font-weight: bold; }
+  tr.total-row td { font-weight: bold; color: #c00; border-top: 2px solid #222; }
+  .bottom { display: flex; margin-top: 16px; gap: 20px; align-items: flex-start; }
+  table.acct { border-collapse: collapse; min-width: 200px; }
+  table.acct th, table.acct td { border: 1px solid #222; padding: 3px 8px; font-size: 11px; }
+  table.acct td.num { text-align: right; border-right: none !important; }
+  table.acct td.paise { border-left: none !important; }
+  table.acct tr.total-row td { font-weight: bold; color: #c00; }
+  .remittance-text { flex: 1; font-size: 11px; line-height: 1.5; }
+  .signatures { display: flex; gap: 32px; margin-top: 40px; }
+  .sig-item { text-align: center; font-size: 11px; }
+  @media print { body { padding: 10px; } }
+</style>
+</head><body>
+<h2>${orgName}</h2>
+<h3>BHOPAL (M.P)</h3>
+<div class="title-line">Remittence of PF Contribution For the Month of &nbsp;<span class="month-red">${monthYear}</span></div>
+
+<table class="main">
+  <thead>
+    <tr>
+      <th rowspan="2">Sl<br>No.</th>
+      <th rowspan="2">Name of the<br>Institution</th>
+      <th colspan="2">Salary<br>(basic+sp+da+daarr.)</th>
+      <th colspan="2">Employee Contribution<br>@12%</th>
+      <th colspan="2">Employer Contribution<br>@3.67%</th>
+      <th colspan="2">Pension<br>Contribution @8.33%</th>
+      <th colspan="2">Voluntary Contribution</th>
+      <th colspan="2">Admin Charges @0.5%</th>
+      <th colspan="2">Total</th>
+      <th rowspan="2">Remarks</th>
+    </tr>
+    <tr>
+      ${Array(7).fill("<th>Rs.</th><th>P.</th>").join("")}
+    </tr>
+  </thead>
+  <tbody>
+    ${rowsHTML}
+  </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td></td>
+      <td></td>
+      ${fmtPaise(T.salary)}
+      ${fmtPaise(T.empContrib)}
+      ${fmtPaise(T.emplrContrib)}
+      ${fmtPaise(T.pension)}
+      ${T.vpf ? fmtPaise(T.vpf) : '<td class="num"></td><td class="paise"></td>'}
+      ${fmtPaise(T.adminCharges)}
+      <td class="num total-col" style="color:#c00;">${Math.floor(T.total).toLocaleString("en-IN")}</td><td class="paise" style="color:#c00;">00</td>
+      <td></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="bottom">
+  <div>
+    <table class="acct">
+      <thead><tr><th>A/c No.</th><th colspan="2">Amount</th></tr></thead>
+      <tbody>
+        <tr><td>01</td>${fmtPaise(acct01)}</tr>
+        <tr><td>02</td>${fmtPaise(acct02)}</tr>
+        <tr><td>10</td>${fmtPaise(acct10)}</tr>
+        <tr class="total-row"><td></td><td class="num">${Math.floor(T.total).toLocaleString("en-IN")}</td><td class="paise">00</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="remittance-text">
+    Remittence of PF amount of Rs. ${Math.floor(T.total).toLocaleString("en-IN")}/- (Rupees ${amtWords} Only) for the month
+    of ${monthYear} to RPFC Bhopal then submitted challen
+  </div>
+</div>
+
+<div class="signatures">
+  <div class="sig-item"><div style="margin-bottom:30px">&nbsp;</div>(prepared by)<br>Account Assistant</div>
+  <div class="sig-item"><div style="margin-bottom:30px">&nbsp;</div>(checked by)<br>Section Officer</div>
+  <div class="sig-item"><div style="margin-bottom:30px">&nbsp;</div>&nbsp;<br>Secretary</div>
+  <div class="sig-item"><div style="margin-bottom:30px">&nbsp;</div>&nbsp;<br>Treasurer</div>
+</div>
+</body></html>`;
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   function buildPaybillHTML(
     month: string,
@@ -654,16 +1459,14 @@ export default function ReportsPage() {
   ): string {
     const orgName =
       institute === "all"
-        ? "Yf's Platform — Salary Management System"
+        ? "Yf's Platform \u2014 Salary Management System"
         : institute;
     const monthShort = `${month.substring(0, 3)}-${year.substring(2)}`;
 
-    // Helper: return blank if 0
     const cell = (n: number) =>
       n ? n.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "";
 
     const rows = salaryRows.map((r, idx) => {
-      // Resolve fields — handle both SalaryProcessingPage saved records and calculated fallback
       const basic = (r as any).basicPay ?? (r as any).basic ?? 0;
       const da = (r as any).da ?? 0;
       const hra = (r as any).hra ?? 0;
@@ -727,7 +1530,6 @@ export default function ReportsPage() {
       </tr>`;
     });
 
-    // Totals
     const T = salaryRows.reduce(
       (acc, r) => {
         const basic = (r as any).basicPay ?? (r as any).basic ?? 0;
@@ -831,8 +1633,6 @@ export default function ReportsPage() {
       },
     );
 
-    const totalEarnings = T.gross;
-
     const sumRow = `<tr class="totals-row">
       <td colspan="3" class="total-label">TOTAL</td>
       <td class="num">${cell(T.basic)}</td><td class="num">${cell(T.specialPay)}</td>
@@ -913,7 +1713,7 @@ export default function ReportsPage() {
 </style>
 </head><body>
 <div class="watermark"><img src="${LOGO_URL}" alt="" /></div>
-<div class="bill-no">Pay Bill No: …………………</div>
+<div class="bill-no">Pay Bill No: &hellip;&hellip;&hellip;&hellip;&hellip;&hellip;</div>
 <div class="page-header">
   <div class="org-name">${orgName}</div>
   <div class="pay-title">Pay Bill for the month of: ${monthShort}</div>
@@ -960,12 +1760,12 @@ export default function ReportsPage() {
   <tbody>
     ${summaryRows}
     <tr class="summary-total">
-      <td>Total Earnings</td><td class="num">${fmt(totalEarnings)}</td>
+      <td>Total Earnings</td><td class="num">${fmt(T.gross)}</td>
       <td>Total Deductions</td><td class="num">${fmt(T.totalDed)}</td>
     </tr>
     <tr class="grand-total">
-      <td colspan="2">Gross Salary: ₹${fmt(totalEarnings)}</td>
-      <td colspan="2">Net Salary: ₹${fmt(T.net)}</td>
+      <td colspan="2">Gross Salary: &#8377;${fmt(T.gross)}</td>
+      <td colspan="2">Net Salary: &#8377;${fmt(T.net)}</td>
     </tr>
   </tbody>
 </table>
@@ -984,7 +1784,7 @@ export default function ReportsPage() {
 </table>
 
 <div class="footer">
-  Generated on ${formatToday()} | © 2026 Yf's Platform — Salary Management System | Author: Sachin Patel
+  Generated on ${formatToday()} | &copy; 2026 Yf's Platform \u2014 Salary Management System
 </div>
 </body></html>`;
   }
@@ -1002,7 +1802,7 @@ export default function ReportsPage() {
           <div>
             <h1 className="text-xl font-display font-bold">Reports Center</h1>
             <p className="text-sm text-muted-foreground">
-              Generate & download statutory and payroll reports
+              Generate &amp; download statutory and payroll reports
             </p>
           </div>
         </div>
@@ -1024,8 +1824,23 @@ export default function ReportsPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select
+            value={selectedSessionYear}
+            onValueChange={setSelectedSessionYear}
+          >
+            <SelectTrigger className="w-28 h-9">
+              <SelectValue placeholder="Session" />
+            </SelectTrigger>
+            <SelectContent>
+              {SESSION_YEAR_LIST.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="w-32 h-9">
               <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -1085,7 +1900,7 @@ export default function ReportsPage() {
               <div className={`${s.color}`}>{s.icon}</div>
               <div>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className="font-bold text-sm">₹{s.value}</p>
+                <p className="font-bold text-sm">&#8377;{s.value}</p>
               </div>
             </CardContent>
           </Card>
@@ -1120,6 +1935,11 @@ export default function ReportsPage() {
                         {rep.icon}
                       </span>
                       {rep.label}
+                      {rep.id === "salary-register" && (
+                        <span className="ml-auto text-[10px] text-muted-foreground font-normal bg-muted px-1.5 py-0.5 rounded">
+                          {selectedSessionYear}
+                        </span>
+                      )}
                     </CardTitle>
                     <p className="text-xs text-muted-foreground ml-9">
                       {rep.desc}
@@ -1139,7 +1959,7 @@ export default function ReportsPage() {
                           disabled={generating === rep.id}
                         >
                           {generating === rep.id ? (
-                            <span className="animate-spin">⏳</span>
+                            <span className="animate-spin">&#8987;</span>
                           ) : (
                             <>
                               <Printer className="w-3 h-3" /> Print

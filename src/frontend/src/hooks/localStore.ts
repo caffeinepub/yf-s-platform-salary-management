@@ -1,5 +1,7 @@
-// ─── localStorage-based data store ──────────────────────────────────────────
+// ─── localStorage-based data store ───────────────────────────────────────────────
 // All IDs are stored as numbers internally; hooks expose bigint for compat.
+
+import { syncKeyToBackend } from "../services/backendSync";
 
 const KEYS = {
   institutes: "sms_institutes",
@@ -21,21 +23,26 @@ function getAll<T>(key: string): T[] {
 }
 
 function saveAll<T>(key: string, items: T[]) {
-  localStorage.setItem(key, JSON.stringify(items));
+  const serialized = JSON.stringify(items);
+  localStorage.setItem(key, serialized);
+  syncKeyToBackend(key, serialized);
 }
 
 function getNextId(key: string): number {
   const current = Number(localStorage.getItem(key) || "1");
-  localStorage.setItem(key, String(current + 1));
+  const next = String(current + 1);
+  localStorage.setItem(key, next);
+  syncKeyToBackend(key, next);
   return current;
 }
 
-// ─── Institute ───────────────────────────────────────────────────────────────
+// ─── Institute ───────────────────────────────────────────────────────────────────────────
 
 export interface LocalInstitute {
   id: number;
   name: string;
   code: string;
+  shortCode: string;
   location: string;
 }
 
@@ -46,11 +53,12 @@ export function localGetAllInstitutes(): LocalInstitute[] {
 export function localAddInstitute(
   name: string,
   code: string,
+  shortCode: string,
   location: string,
 ): number {
   const id = getNextId(KEYS.nextInstituteId);
   const items = localGetAllInstitutes();
-  items.push({ id, name, code, location });
+  items.push({ id, name, code, shortCode, location });
   saveAll(KEYS.institutes, items);
   return id;
 }
@@ -59,10 +67,11 @@ export function localUpdateInstitute(
   id: number,
   name: string,
   code: string,
+  shortCode: string,
   location: string,
 ) {
   const items = localGetAllInstitutes().map((i) =>
-    i.id === id ? { ...i, name, code, location } : i,
+    i.id === id ? { ...i, name, code, shortCode, location } : i,
   );
   saveAll(KEYS.institutes, items);
 }
@@ -74,7 +83,7 @@ export function localDeleteInstitute(id: number) {
   );
 }
 
-// ─── Employee ────────────────────────────────────────────────────────────────
+// ─── Employee ──────────────────────────────────────────────────────────────────────────
 
 export interface LocalEmployee {
   id: number;
@@ -141,7 +150,7 @@ export function localDeleteEmployee(id: number) {
   );
 }
 
-// ─── Attendance ──────────────────────────────────────────────────────────────
+// ─── Attendance ────────────────────────────────────────────────────────────────────────
 
 export interface LocalAttendanceRecord {
   employeeId: number;
@@ -228,7 +237,7 @@ export function localGetAttendanceForInstitute(
   );
 }
 
-// ─── Salary ──────────────────────────────────────────────────────────────────
+// ─── Salary ──────────────────────────────────────────────────────────────────────────────
 
 export interface LocalSalaryRecord {
   employeeId: number;
@@ -407,7 +416,7 @@ export function localGetSalariesForInstitute(
   );
 }
 
-// ─── Daily Workers ───────────────────────────────────────────────────────────
+// ─── Daily Workers ───────────────────────────────────────────────────────────────────
 
 export interface LocalDailyWorker {
   id: number;

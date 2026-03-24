@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Clock,
   Lock,
+  RotateCcw,
   Save,
   Trash2,
   XCircle,
@@ -292,6 +293,12 @@ export default function AttendancePage() {
     } catch {
       toast.error("Failed to save attendance");
     }
+  };
+
+  const handleClear = () => {
+    if (!specificEmployeeId || isLocked) return;
+    setDayStatuses(buildDefaultStatuses(month, year));
+    toast.success("Attendance reset to defaults");
   };
 
   const showCalendar = specificEmployeeId !== null;
@@ -620,15 +627,26 @@ export default function AttendancePage() {
                 </Dialog>
               </>
             ) : (
-              <Button
-                onClick={handleSave}
-                disabled={saveAttendance.isPending}
-                className="gradient-primary text-white gap-2"
-                data-ocid="attendance.save_button"
-              >
-                <Save className="w-4 h-4" />
-                {saveAttendance.isPending ? "Saving..." : "Save Attendance"}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleClear}
+                  className="gap-2"
+                  data-ocid="attendance.clear_button"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Clear
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saveAttendance.isPending}
+                  className="gradient-primary text-white gap-2"
+                  data-ocid="attendance.save_button"
+                >
+                  <Save className="w-4 h-4" />
+                  {saveAttendance.isPending ? "Saving..." : "Save Attendance"}
+                </Button>
+              </>
             )}
           </motion.div>
         </>

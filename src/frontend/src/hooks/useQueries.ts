@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Designation, EmploymentType } from "../backend.d";
+import { Designation, EmploymentType } from "../backend";
 import type {
   LocalAttendanceRecord,
   LocalDailyWorker,
@@ -41,6 +41,7 @@ export interface Institute {
   id: bigint;
   name: string;
   code: string;
+  shortCode: string;
   location: string;
 }
 
@@ -242,9 +243,10 @@ export function useAddInstitute() {
     mutationFn: async ({
       name,
       code,
+      shortCode,
       location,
-    }: { name: string; code: string; location: string }) => {
-      return localAddInstitute(name, code, location);
+    }: { name: string; code: string; shortCode: string; location: string }) => {
+      return localAddInstitute(name, code, shortCode, location);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["institutes"] }),
   });
@@ -257,9 +259,16 @@ export function useUpdateInstitute() {
       id,
       name,
       code,
+      shortCode,
       location,
-    }: { id: bigint; name: string; code: string; location: string }) => {
-      localUpdateInstitute(Number(id), name, code, location);
+    }: {
+      id: bigint;
+      name: string;
+      code: string;
+      shortCode: string;
+      location: string;
+    }) => {
+      localUpdateInstitute(Number(id), name, code, shortCode, location);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["institutes"] }),
   });

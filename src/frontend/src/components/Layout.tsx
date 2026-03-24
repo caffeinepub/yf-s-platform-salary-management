@@ -1,27 +1,48 @@
 import { Button } from "@/components/ui/button";
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   Banknote,
   BarChart3,
   Bell,
+  BookMarked,
+  BookOpen,
   Building2,
+  Calendar,
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
   FileText,
+  GraduationCap,
   HardHat,
   IndianRupee,
   LayoutDashboard,
+  LayoutGrid,
+  ListChecks,
   LogOut,
   Menu,
+  Moon,
+  Package,
+  Receipt,
+  Scale,
   Settings,
   Shield,
+  ShoppingCart,
+  Sun,
+  TrendingUp,
+  Upload,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import type { PageName } from "../App";
+import type { AppSystem, PageName } from "../App";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import type { FeesPage } from "../fees/types";
+import type { TallyPage } from "../tally/types";
+import SyncIndicator from "./SyncIndicator";
 
 interface NavItem {
   id: PageName;
@@ -87,22 +108,196 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
 ];
 
+interface TallyNavGroup {
+  label: string;
+  items: { id: TallyPage; label: string; icon: React.ReactNode }[];
+}
+
+const TALLY_NAV_GROUPS: TallyNavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: <LayoutDashboard className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Data Entry",
+    items: [
+      {
+        id: "transactions",
+        label: "Transactions",
+        icon: <Upload className="w-4 h-4" />,
+      },
+      {
+        id: "journal",
+        label: "Journal",
+        icon: <BookOpen className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Books",
+    items: [
+      {
+        id: "daybook",
+        label: "Day Book",
+        icon: <Calendar className="w-4 h-4" />,
+      },
+      {
+        id: "cashbook",
+        label: "Cash Book",
+        icon: <Wallet className="w-4 h-4" />,
+      },
+      {
+        id: "bankbook",
+        label: "Bank Book",
+        icon: <Building2 className="w-4 h-4" />,
+      },
+      {
+        id: "purchase",
+        label: "Purchase Register",
+        icon: <ShoppingCart className="w-4 h-4" />,
+      },
+      {
+        id: "sales",
+        label: "Sales Register",
+        icon: <TrendingUp className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Analysis",
+    items: [
+      {
+        id: "ledger",
+        label: "Ledger",
+        icon: <BookMarked className="w-4 h-4" />,
+      },
+      {
+        id: "trialbalance",
+        label: "Trial Balance",
+        icon: <Scale className="w-4 h-4" />,
+      },
+      {
+        id: "balancesheet",
+        label: "Balance Sheet",
+        icon: <LayoutGrid className="w-4 h-4" />,
+      },
+      {
+        id: "profitloss",
+        label: "Profit & Loss",
+        icon: <BarChart3 className="w-4 h-4" />,
+      },
+      {
+        id: "receivables",
+        label: "Receivables",
+        icon: <ArrowDownLeft className="w-4 h-4" />,
+      },
+      {
+        id: "payables",
+        label: "Payables",
+        icon: <ArrowUpRight className="w-4 h-4" />,
+      },
+      {
+        id: "stock",
+        label: "Stock Summary",
+        icon: <Package className="w-4 h-4" />,
+      },
+    ],
+  },
+];
+
+interface FeesNavGroup {
+  label: string;
+  items: { id: FeesPage; label: string; icon: React.ReactNode }[];
+}
+
+const FEES_NAV_GROUPS: FeesNavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: <LayoutDashboard className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      {
+        id: "students",
+        label: "Students",
+        icon: <Users className="w-4 h-4" />,
+      },
+      {
+        id: "feestructure",
+        label: "Fee Structure",
+        icon: <ListChecks className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Transactions",
+    items: [
+      {
+        id: "collectfee",
+        label: "Collect Fee",
+        icon: <IndianRupee className="w-4 h-4" />,
+      },
+      {
+        id: "payments",
+        label: "Payments",
+        icon: <Receipt className="w-4 h-4" />,
+      },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      {
+        id: "reports",
+        label: "Reports",
+        icon: <BarChart3 className="w-4 h-4" />,
+      },
+    ],
+  },
+];
+
 interface LayoutProps {
   currentPage: PageName;
   onNavigate: (page: PageName) => void;
+  appSystem: AppSystem;
+  onSystemChange: (system: AppSystem) => void;
+  tallyPage: TallyPage;
+  onTallyNavigate: (page: TallyPage) => void;
+  feesPage: FeesPage;
+  onFeesNavigate: (page: FeesPage) => void;
   children: React.ReactNode;
 }
 
 export default function Layout({
   currentPage,
   onNavigate,
+  appSystem,
+  onSystemChange,
+  tallyPage,
+  onTallyNavigate,
+  feesPage,
+  onFeesNavigate,
   children,
 }: LayoutProps) {
   const { role, username, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const visibleItems = NAV_ITEMS.filter((item) => {
+  const visibleSalaryItems = NAV_ITEMS.filter((item) => {
     if (item.adminOnly && role !== "admin") return false;
     return true;
   });
@@ -131,45 +326,151 @@ export default function Layout({
               Yf&apos;s Platform
             </p>
             <p className="text-[10px] text-muted-foreground">
-              Salary Management
+              {appSystem === "tally"
+                ? "Tally Records"
+                : appSystem === "fees"
+                  ? "Fees Manager"
+                  : "Salary Management"}
             </p>
           </div>
         )}
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {visibleItems.map((item) => {
-          const isActive = currentPage === item.id;
-          return (
-            <button
-              type="button"
-              key={item.id}
-              onClick={() => {
-                onNavigate(item.id);
-                setMobileOpen(false);
-              }}
-              data-ocid={`nav.${item.id}.link`}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                isActive
-                  ? "gradient-primary text-white glow-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
-              } ${collapsed ? "justify-center" : ""}`}
-            >
-              <span
-                className={`flex-shrink-0 ${isActive ? "" : "group-hover:scale-110 transition-transform"}`}
+      {/* Nav — Salary */}
+      {appSystem === "salary" && (
+        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+          {visibleSalaryItems.map((item) => {
+            const isActive = currentPage === item.id;
+            return (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => {
+                  onNavigate(item.id);
+                  setMobileOpen(false);
+                }}
+                data-ocid={`nav.${item.id}.link`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                  isActive
+                    ? "gradient-primary text-white glow-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                } ${collapsed ? "justify-center" : ""}`}
               >
-                {item.icon}
-              </span>
-              {!collapsed && (
-                <span className="text-sm font-medium truncate">
-                  {item.label}
+                <span
+                  className={`flex-shrink-0 ${
+                    isActive ? "" : "group-hover:scale-110 transition-transform"
+                  }`}
+                >
+                  {item.icon}
                 </span>
+                {!collapsed && (
+                  <span className="text-sm font-medium truncate">
+                    {item.label}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {/* Nav — Tally */}
+      {appSystem === "tally" && (
+        <nav className="flex-1 py-2 px-2 overflow-y-auto">
+          {TALLY_NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-2">
+              {!collapsed && (
+                <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  {group.label}
+                </p>
               )}
-            </button>
-          );
-        })}
-      </nav>
+              {group.items.map((item) => {
+                const isActive = tallyPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      onTallyNavigate(item.id);
+                      setMobileOpen(false);
+                    }}
+                    data-ocid={`tally.nav.${item.id}.link`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      collapsed ? "justify-center" : ""
+                    } ${
+                      isActive
+                        ? "gradient-primary text-white glow-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <span
+                      className={`flex-shrink-0 ${
+                        isActive
+                          ? ""
+                          : "group-hover:scale-110 transition-transform"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    {!collapsed && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      )}
+
+      {/* Nav — Fees */}
+      {appSystem === "fees" && (
+        <nav className="flex-1 py-2 px-2 overflow-y-auto">
+          {FEES_NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-2">
+              {!collapsed && (
+                <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  {group.label}
+                </p>
+              )}
+              {group.items.map((item) => {
+                const isActive = feesPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      onFeesNavigate(item.id);
+                      setMobileOpen(false);
+                    }}
+                    data-ocid={`fees.nav.${item.id}.link`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                      collapsed ? "justify-center" : ""
+                    } ${
+                      isActive
+                        ? "gradient-primary text-white glow-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <span
+                      className={`flex-shrink-0 ${
+                        isActive
+                          ? ""
+                          : "group-hover:scale-110 transition-transform"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    {!collapsed && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      )}
 
       {/* Bottom: user info + logout */}
       <div className="border-t border-sidebar-border p-3">
@@ -203,6 +504,17 @@ export default function Layout({
     </div>
   );
 
+  const activePageLabel =
+    appSystem === "salary"
+      ? (NAV_ITEMS.find((i) => i.id === currentPage)?.label ?? "Dashboard")
+      : appSystem === "tally"
+        ? (TALLY_NAV_GROUPS.flatMap((g) => g.items).find(
+            (i) => i.id === tallyPage,
+          )?.label ?? "Dashboard")
+        : (FEES_NAV_GROUPS.flatMap((g) => g.items).find(
+            (i) => i.id === feesPage,
+          )?.label ?? "Dashboard");
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop Sidebar */}
@@ -212,7 +524,6 @@ export default function Layout({
         className="hidden md:flex flex-col bg-sidebar border-r border-sidebar-border relative flex-shrink-0 overflow-hidden"
       >
         <SidebarContent />
-        {/* Collapse toggle */}
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
@@ -270,12 +581,89 @@ export default function Layout({
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h2 className="font-display font-semibold text-foreground/90 capitalize">
-              {NAV_ITEMS.find((i) => i.id === currentPage)?.label ??
-                "Dashboard"}
+
+            {/* System Switcher */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => onSystemChange("salary")}
+                data-ocid="topnav.salary_system.tab"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  appSystem === "salary"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <IndianRupee className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Salary Management</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSystemChange("tally")}
+                data-ocid="topnav.tally_system.tab"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  appSystem === "tally"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tally Records</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSystemChange("fees")}
+                data-ocid="topnav.fees_system.tab"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  appSystem === "fees"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Fees Manager</span>
+              </button>
+            </div>
+
+            <h2 className="font-display font-semibold text-foreground/90 capitalize hidden md:block">
+              {activePageLabel}
             </h2>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              data-ocid="topnav.theme.toggle"
+              title={
+                theme === "dark" ? "Switch to Day mode" : "Switch to Dark mode"
+              }
+              className="w-9 h-9 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-all duration-200"
+            >
+              <AnimatePresence mode="wait">
+                {theme === "dark" ? (
+                  <motion.span
+                    key="sun"
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Sun className="w-4 h-4" />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="moon"
+                    initial={{ rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Moon className="w-4 h-4" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+            <SyncIndicator />
             <button
               type="button"
               className="w-8 h-8 rounded-lg bg-card/60 border border-border/40 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -309,7 +697,7 @@ export default function Layout({
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentPage}
+              key={appSystem}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}

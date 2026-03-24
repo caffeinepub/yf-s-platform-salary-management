@@ -46,10 +46,16 @@ import {
 interface InstituteForm {
   name: string;
   code: string;
+  shortCode: string;
   location: string;
 }
 
-const EMPTY_FORM: InstituteForm = { name: "", code: "", location: "" };
+const EMPTY_FORM: InstituteForm = {
+  name: "",
+  code: "",
+  shortCode: "",
+  location: "",
+};
 
 export default function InstituteManagementPage() {
   const { data: institutes = [], isLoading } = useGetAllInstitutes();
@@ -78,7 +84,12 @@ export default function InstituteManagementPage() {
 
   const openEdit = (inst: Institute) => {
     setEditTarget(inst);
-    setForm({ name: inst.name, code: inst.code, location: inst.location });
+    setForm({
+      name: inst.name,
+      code: inst.code,
+      shortCode: (inst as any).shortCode || "",
+      location: inst.location,
+    });
     setFormOpen(true);
   };
 
@@ -216,15 +227,25 @@ export default function InstituteManagementPage() {
                         <CardTitle className="text-base font-display">
                           {inst.name}
                         </CardTitle>
-                        {inst.code && (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs mt-1 bg-muted/60"
-                          >
-                            <Hash className="w-3 h-3 mr-1" />
-                            {inst.code}
-                          </Badge>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {inst.code && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-muted/60"
+                            >
+                              <Hash className="w-3 h-3 mr-1" />
+                              {inst.code}
+                            </Badge>
+                          )}
+                          {(inst as any).shortCode && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-primary/10 text-primary border-primary/30"
+                            >
+                              {(inst as any).shortCode}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -307,6 +328,23 @@ export default function InstituteManagementPage() {
                 placeholder="e.g., SXC001 (optional)"
                 className="bg-input/60 border-border/60 text-foreground font-medium"
                 data-ocid="institutes.code.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <Hash className="w-3.5 h-3.5" /> Short Code
+                <span className="text-xs text-muted-foreground font-normal">
+                  (used in reports, e.g., BSM)
+                </span>
+              </Label>
+              <Input
+                value={form.shortCode}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, shortCode: e.target.value }))
+                }
+                placeholder="e.g., BSM, VHSS (optional)"
+                className="bg-input/60 border-border/60 text-foreground font-medium"
+                data-ocid="institutes.shortCode.input"
               />
             </div>
             <div className="space-y-1.5">

@@ -46,6 +46,7 @@ import {
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { syncKeyToBackend } from "../services/backendSync";
 
 type EmployeeCredential = {
   id: string;
@@ -172,6 +173,7 @@ function UserPasswordSection() {
       return;
     }
     localStorage.setItem("sms_admin_password", newAdminPwd);
+    syncKeyToBackend("sms_admin_password", newAdminPwd);
     toast.success("Admin password updated successfully.");
     setCurrentAdminPwd("");
     setNewAdminPwd("");
@@ -446,6 +448,7 @@ function SalaryConfigSection() {
 
   function save() {
     localStorage.setItem("sms_salary_config", JSON.stringify(config));
+    syncKeyToBackend("sms_salary_config", JSON.stringify(config));
     toast.success("Salary configuration saved.");
     setOpen(false);
   }

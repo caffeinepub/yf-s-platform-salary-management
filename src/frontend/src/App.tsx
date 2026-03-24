@@ -1,9 +1,12 @@
 import { Toaster } from "@/components/ui/sonner";
-import { Building2, FileText, Home, LogOut, User } from "lucide-react";
+import { Building2, FileText, Home, Loader2, LogOut, User } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import FeesApp from "./fees/FeesApp";
+import type { FeesPage } from "./fees/types";
 import AttendancePage from "./pages/AttendancePage";
 import DailyWorkersPage from "./pages/DailyWorkersPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -18,6 +21,9 @@ import ReportsPage from "./pages/ReportsPage";
 import SalaryDetailsPage from "./pages/SalaryDetailsPage";
 import SalaryProcessingPage from "./pages/SalaryProcessingPage";
 import SettingsPage from "./pages/SettingsPage";
+import { syncFromBackend } from "./services/backendSync";
+import TallyApp from "./tally/TallyApp";
+import type { TallyPage } from "./tally/types";
 
 export type PageName =
   | "dashboard"
@@ -30,6 +36,8 @@ export type PageName =
   | "dailyWorkers"
   | "reports"
   | "settings";
+
+export type AppSystem = "salary" | "tally" | "fees";
 
 type EmpPage = "dashboard" | "profile" | "salaryslips";
 
@@ -65,7 +73,6 @@ function EmployeeApp() {
       className="flex h-screen overflow-hidden"
       style={{ background: "oklch(0.10 0.04 260)" }}
     >
-      {/* Slim sidebar */}
       <motion.aside
         initial={{ x: -60, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
@@ -77,7 +84,6 @@ function EmployeeApp() {
           borderRight: "1px solid oklch(0.28 0.10 260 / 0.5)",
         }}
       >
-        {/* Logo / user */}
         <div
           className="p-5 border-b"
           style={{ borderColor: "oklch(0.28 0.10 260 / 0.4)" }}
@@ -119,7 +125,6 @@ function EmployeeApp() {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 p-3 space-y-1">
           {EMP_NAV.map((item) => {
             const Icon = item.icon;
@@ -150,7 +155,6 @@ function EmployeeApp() {
           })}
         </nav>
 
-        {/* Institute badge */}
         <div className="px-3 pb-2">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
@@ -164,7 +168,6 @@ function EmployeeApp() {
           </div>
         </div>
 
-        {/* Logout */}
         <div
           className="p-3 border-t"
           style={{ borderColor: "oklch(0.28 0.10 260 / 0.4)" }}
@@ -185,7 +188,6 @@ function EmployeeApp() {
         </div>
       </motion.aside>
 
-      {/* Content */}
       <main className="flex-1 overflow-y-auto">
         <div className="p-6 min-h-full">{renderPage()}</div>
       </main>
@@ -196,14 +198,23 @@ function EmployeeApp() {
 function AppInner() {
   const { isAuthenticated, role } = useAuth();
   const [currentPage, setCurrentPage] = useState<PageName>("dashboard");
+  const [appSystem, setAppSystem] = useState<AppSystem>("salary");
+  const [tallyPage, setTallyPage] = useState<TallyPage>("dashboard");
+  const [feesPage, setFeesPage] = useState<FeesPage>("dashboard");
 
   useEffect(() => {
     if (!isAuthenticated) {
       document.title = "Yf's Platform";
     } else if (role === "admin") {
-      document.title = "Yf's Platform | Salary Management";
+      if (appSystem === "tally") {
+        document.title = "Yf's Platform | Tally Records";
+      } else if (appSystem === "fees") {
+        document.title = "Yf's Platform | Fees Manager";
+      } else {
+        document.title = "Yf's Platform | Salary Management";
+      }
     }
-  }, [isAuthenticated, role]);
+  }, [isAuthenticated, role, appSystem]);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -213,7 +224,7 @@ function AppInner() {
     return <EmployeeApp />;
   }
 
-  const renderPage = () => {
+  const renderSalaryPage = () => {
     switch (currentPage) {
       case "dashboard":
         return <DashboardPage />;
@@ -241,17 +252,62 @@ function AppInner() {
   };
 
   return (
-    <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderPage()}
+    <Layout
+      currentPage={currentPage}
+      onNavigate={setCurrentPage}
+      appSystem={appSystem}
+      onSystemChange={setAppSystem}
+      tallyPage={tallyPage}
+      onTallyNavigate={setTallyPage}
+      feesPage={feesPage}
+      onFeesNavigate={setFeesPage}
+    >
+      {appSystem === "tally" ? (
+        <TallyApp currentPage={tallyPage} onNavigate={setTallyPage} />
+      ) : appSystem === "fees" ? (
+        <FeesApp currentPage={feesPage} onNavigate={setFeesPage} />
+      ) : (
+        renderSalaryPage()
+      )}
     </Layout>
   );
 }
 
-export default function App() {
+function SyncOverlay({ visible }: { visible: boolean }) {
+  if (!visible) return null;
   return (
-    <AuthProvider>
-      <AppInner />
-      <Toaster richColors position="top-right" />
-    </AuthProvider>
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4"
+      style={{ background: "oklch(0.08 0.03 260 / 0.92)" }}
+    >
+      <Loader2
+        className="w-10 h-10 animate-spin"
+        style={{ color: "oklch(0.70 0.20 260)" }}
+      />
+      <p
+        className="text-sm font-medium"
+        style={{ color: "oklch(0.75 0.12 260)" }}
+      >
+        Syncing data...
+      </p>
+    </div>
+  );
+}
+
+export default function App() {
+  const [syncing, setSyncing] = useState(true);
+
+  useEffect(() => {
+    syncFromBackend().finally(() => setSyncing(false));
+  }, []);
+
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <SyncOverlay visible={syncing} />
+        {!syncing && <AppInner />}
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
