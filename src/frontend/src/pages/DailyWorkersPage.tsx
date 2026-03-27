@@ -47,6 +47,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { localGetAllInstitutes } from "../hooks/localStore";
+import {
+  getCurrentSession,
+  getSessionList,
+  getYearFromSession,
+} from "../utils/sessionUtils";
 
 type WorkerStatus = "active" | "transferred" | "resigned" | "removed";
 
@@ -92,13 +98,7 @@ function savePeriods(data: WorkerPeriod[]) {
   localStorage.setItem("dailyWorkerPeriods", JSON.stringify(data));
 }
 function getInstitutes(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem("institutes") || "[]").map(
-      (i: { name: string }) => i.name,
-    );
-  } catch {
-    return [];
-  }
+  return localGetAllInstitutes().map((i) => i.name);
 }
 
 function generateId() {
@@ -196,11 +196,11 @@ const STATUS_CONFIG: Record<
 };
 
 export default function DailyWorkersPage() {
-  const now = new Date();
   const [workers, setWorkers] = useState<DailyWorker[]>(getWorkers);
   const [periods, setPeriods] = useState<WorkerPeriod[]>(getPeriods);
   const [filterInstitute, setFilterInstitute] = useState("all");
-  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
+  const [selectedSession, setSelectedSession] = useState(getCurrentSession());
+  const sessionList = getSessionList();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editWorker, setEditWorker] = useState<DailyWorker | null>(null);
   const [statusWorker, setStatusWorker] = useState<{
@@ -223,11 +223,10 @@ export default function DailyWorkersPage() {
   const [transferTo, setTransferTo] = useState("");
 
   const institutes = getInstitutes();
-  const yearPeriods = generatePeriods(Number(selectedYear));
-  const years = Array.from(
-    { length: new Date().getFullYear() - 2019 },
-    (_, i) => String(2020 + i),
+  const selectedYear = String(
+    Number.parseInt(selectedSession.split("-")[0], 10),
   );
+  const yearPeriods = generatePeriods(Number(selectedYear));
 
   const filteredWorkers = workers.filter(
     (w) => filterInstitute === "all" || w.institute === filterInstitute,
@@ -445,7 +444,7 @@ export default function DailyWorkersPage() {
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="Institute" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((i) => (
                 <SelectItem key={i} value={i}>
@@ -454,14 +453,14 @@ export default function DailyWorkersPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-24 h-9">
+          <Select value={selectedSession} onValueChange={setSelectedSession}>
+            <SelectTrigger className="w-28 h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {sessionList.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -652,7 +651,7 @@ export default function DailyWorkersPage() {
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select institute" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[250px] overflow-y-auto">
                   {institutes.map((i) => (
                     <SelectItem key={i} value={i}>
                       {i}
@@ -698,7 +697,7 @@ export default function DailyWorkersPage() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select institute" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[250px] overflow-y-auto">
                   {institutes
                     .filter((i) => i !== statusWorker.worker.institute)
                     .map((i) => (
@@ -751,7 +750,7 @@ export default function DailyWorkersPage() {
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent className="max-h-[250px] overflow-y-auto">
                     {yearPeriods.map((p) => {
                       const saved =
                         attendanceWorker &&

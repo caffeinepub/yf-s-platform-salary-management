@@ -16,6 +16,11 @@ import {
   useGetEmployeesForInstitute,
   useGetSalary,
 } from "../hooks/useQueries";
+import {
+  getCurrentSession,
+  getSessionList,
+  getYearFromSession,
+} from "../utils/sessionUtils";
 
 const MONTH_NAMES = [
   "January",
@@ -51,12 +56,6 @@ function getSessionMonths(): { value: string; label: string }[] {
   return months.reverse();
 }
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from(
-  { length: CURRENT_YEAR - 2000 },
-  (_, i) => CURRENT_YEAR - i,
-);
-
 const fmt = (n: bigint | number) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 export default function PayslipPage() {
@@ -64,7 +63,9 @@ export default function PayslipPage() {
   const [instituteId, setInstituteId] = useState<bigint | null>(null);
   const [employeeId, setEmployeeId] = useState<bigint | null>(null);
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [session, setSession] = useState(getCurrentSession());
+  const sessionList = getSessionList();
+  const year = getYearFromSession(session, month);
 
   const { data: institutes = [] } = useGetAllInstitutes();
   const { data: employees = [] } = useGetEmployeesForInstitute(instituteId);
@@ -110,7 +111,7 @@ export default function PayslipPage() {
           <SelectTrigger data-ocid="payslip.select">
             <SelectValue placeholder="Select Institute" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             {institutes.map((inst) => (
               <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
                 {inst.name}
@@ -126,7 +127,7 @@ export default function PayslipPage() {
           <SelectTrigger data-ocid="payslip.select">
             <SelectValue placeholder="Select Employee" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             {employees.map((emp) => (
               <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
                 {emp.name}
@@ -141,7 +142,7 @@ export default function PayslipPage() {
           <SelectTrigger data-ocid="payslip.select">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             {getSessionMonths().map((m) => (
               <SelectItem key={m.value} value={m.value}>
                 {m.label}
@@ -149,17 +150,14 @@ export default function PayslipPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select
-          value={year.toString()}
-          onValueChange={(v) => setYear(Number(v))}
-        >
+        <Select value={session} onValueChange={setSession}>
           <SelectTrigger data-ocid="payslip.select">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => (
-              <SelectItem key={y} value={y.toString()}>
-                {y}
+          <SelectContent className="max-h-[250px] overflow-y-auto">
+            {sessionList.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
               </SelectItem>
             ))}
           </SelectContent>

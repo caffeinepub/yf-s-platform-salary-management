@@ -23,7 +23,6 @@ import {
 import {
   AlertCircle,
   BadgeIndianRupee,
-  Banknote,
   Building2,
   Calculator,
   CalendarDays,
@@ -41,6 +40,16 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  type LocalEmployee,
+  localGetAllEmployees,
+  localGetAllInstitutes,
+} from "../hooks/localStore";
+import {
+  getCurrentSession,
+  getSessionList,
+  getYearFromSession,
+} from "../utils/sessionUtils";
 
 const MONTHS = [
   "January",
@@ -56,10 +65,6 @@ const MONTHS = [
   "November",
   "December",
 ];
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2000 }, (_, i) =>
-  String(CURRENT_YEAR - i),
-);
 
 function getSessionMonthNames(): string[] {
   const now = new Date();
@@ -74,31 +79,23 @@ function getSessionMonthNames(): string[] {
   return result.reverse();
 }
 
-type Employee = {
-  id: string;
-  name: string;
-  employeeId: string;
-  institute: string;
-  designation: string;
-  department: string;
-  employmentType: "regular" | "temporary";
-  basicSalary: number;
-};
-
 type SalaryRecord = {
-  employeeId: string;
-  month: string;
-  year: string;
-  locked: boolean;
-  basicPay: number;
+  employeeId: number;
+  month: number;
+  year: number;
+  isLocked: boolean;
+  basicSalary: number;
   lwp: number;
   lwpPrev: number;
   lwpCurr: number;
   specialPay: number;
   daPercent: number;
   hraPercent: number;
+  da: number;
+  hra: number;
   bonus: number;
   daArrears: number;
+  arrears: number;
   ta: number;
   conveyanceAllowance: number;
   washingAllowance: number;
@@ -107,6 +104,7 @@ type SalaryRecord = {
   incentive: number;
   otherEarnings: number;
   grossEarnings: number;
+  grossSalary: number;
   houseRent: number;
   electricityCharges: number;
   lwf: number;
@@ -121,26 +119,20 @@ type SalaryRecord = {
   otherDeductions: number;
   totalDeductions: number;
   netEarnings: number;
-  da?: number;
-  hra?: number;
-  gross?: number;
-  pf?: number;
-  esic?: number;
-  pt?: number;
-  it?: number;
-  net?: number;
+  netSalary: number;
+  pf: number;
+  esic: number;
+  pt: number;
   employmentType?: string;
 };
 
 type SalaryInputs = {
-  lwp: number;
-  lwpPrev: number;
-  lwpCurr: number;
   specialPay: number;
   daPercent: number;
   hraPercent: number;
   bonus: number;
   daArrears: number;
+  arrears: number;
   ta: number;
   conveyanceAllowance: number;
   washingAllowance: number;
@@ -150,8 +142,6 @@ type SalaryInputs = {
   otherEarnings: number;
   houseRent: number;
   electricityCharges: number;
-  lwf: number;
-  vpf: number;
   lic: number;
   festival: number;
   security: number;
@@ -211,7 +201,6 @@ function calculateLWPFromAttendance(
         } else if (d.status === "holiday" || d.leaveType === "PH") {
           if (!isCLRun) effectiveLWP.add(d.key);
         }
-        // CL, EL, HPL, ML = paid (no LWP)
       }
       i = j;
     } else {
@@ -228,29 +217,30 @@ function calculateLWPFromAttendance(
   return { lwpPrev, lwpCurr };
 }
 
-function defaultInputs(emp: Employee): SalaryInputs {
+function getEmpExtra(employeeId: string) {
+  try {
+    return JSON.parse(localStorage.getItem(`empExtra_${employeeId}`) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function defaultInputs(emp: LocalEmployee): SalaryInputs {
   const isRegular = emp.employmentType === "regular";
   const empTA = (() => {
     try {
-      return (
-        Number(
-          JSON.parse(localStorage.getItem(`empExtra_${emp.employeeId}`) || "{}")
-            .ta,
-        ) || 0
-      );
+      return Number(getEmpExtra(emp.employeeId).ta) || 0;
     } catch {
       return 0;
     }
   })();
   return {
-    lwp: 0,
-    lwpPrev: 0,
-    lwpCurr: 0,
     specialPay: 0,
     daPercent: isRegular ? 257 : 0,
     hraPercent: isRegular ? 20 : 0,
     bonus: 0,
     daArrears: 0,
+    arrears: 0,
     ta: isRegular ? empTA : 0,
     conveyanceAllowance: 0,
     washingAllowance: 0,
@@ -260,8 +250,6 @@ function defaultInputs(emp: Employee): SalaryInputs {
     otherEarnings: 0,
     houseRent: 0,
     electricityCharges: 0,
-    lwf: 0,
-    vpf: 0,
     lic: 0,
     festival: 0,
     security: 0,
@@ -269,13 +257,24 @@ function defaultInputs(emp: Employee): SalaryInputs {
   };
 }
 
+function getLWFConfig() {
+  try {
+    const stored = localStorage.getItem("sms_lwf_config");
+    if (stored) return { amount: 10, months: [6, 12], ...JSON.parse(stored) };
+  } catch {}
+  return { amount: 10, months: [6, 12] };
+}
+
 function calcSalary(
-  emp: Employee,
+  emp: LocalEmployee,
   inputs: SalaryInputs,
+  lwpPrev: number,
+  lwpCurr: number,
   monthNum: number,
   yearNum: number,
-): Omit<SalaryRecord, "locked" | "month" | "year"> {
+): Omit<SalaryRecord, "isLocked" | "month" | "year"> {
   const basic = Number(emp.basicSalary) || 0;
+  const isRegular = emp.employmentType === "regular";
 
   const prevMonth = monthNum === 1 ? 12 : monthNum - 1;
   const prevYear = monthNum === 1 ? yearNum - 1 : yearNum;
@@ -283,36 +282,58 @@ function calcSalary(
   const totalCurr = getDaysInMonthUtil(monthNum, yearNum);
 
   const lwpDeduction = Math.round(
-    (basic * inputs.lwpPrev) / totalPrev + (basic * inputs.lwpCurr) / totalCurr,
+    (basic * lwpPrev) / totalPrev + (basic * lwpCurr) / totalCurr,
   );
   const adjustedBasic = Math.max(0, basic - lwpDeduction);
 
-  const da = Math.round((adjustedBasic * inputs.daPercent) / 100);
-  const hra = Math.round((adjustedBasic * inputs.hraPercent) / 100);
+  // Auto LWF: read from config
+  const lwfConfig = getLWFConfig();
+  const lwf = lwfConfig.months.includes(monthNum) ? lwfConfig.amount : 0;
 
-  const totalLWP = inputs.lwpPrev + inputs.lwpCurr;
+  // VPF from empExtra
+  const extra = getEmpExtra(emp.employeeId);
+  const vpfMode = extra.vpfMode || "percent";
+  const vpfValue = Number(extra.vpfValue || 0);
+  const vpf =
+    vpfMode === "fixed"
+      ? vpfValue
+      : Math.round((adjustedBasic * vpfValue) / 100);
+
+  // Earnings - regular employees get all allowances, temp only get arrears
+  const da = isRegular
+    ? Math.round((adjustedBasic * inputs.daPercent) / 100)
+    : 0;
+  const hra = isRegular
+    ? Math.round((adjustedBasic * inputs.hraPercent) / 100)
+    : 0;
+
+  const totalLWP = lwpPrev + lwpCurr;
   const totalPeriodDays = totalPrev - 25 + 1 + 24;
-  const ta =
-    totalLWP === 0
+  const ta = isRegular
+    ? totalLWP === 0
       ? inputs.ta
-      : Math.round(
-          inputs.ta * ((totalPeriodDays - totalLWP) / totalPeriodDays),
-        );
+      : Math.round(inputs.ta * ((totalPeriodDays - totalLWP) / totalPeriodDays))
+    : 0;
+
+  const specialPay = isRegular ? inputs.specialPay : 0;
+  const ltc = isRegular ? inputs.ltc : 0;
+  const daArrears = isRegular ? inputs.daArrears : 0;
 
   const grossEarnings =
     adjustedBasic +
     da +
     hra +
     ta +
-    inputs.specialPay +
-    inputs.daArrears +
+    specialPay +
+    daArrears +
     inputs.conveyanceAllowance +
     inputs.washingAllowance +
-    inputs.ltc +
+    ltc +
     inputs.festivalAdvance +
     inputs.incentive +
     inputs.otherEarnings +
-    inputs.bonus;
+    inputs.bonus +
+    (isRegular ? 0 : inputs.arrears);
 
   const epf = Math.round(adjustedBasic * 0.12);
   const esi = grossEarnings <= 21000 ? Math.round(grossEarnings * 0.0075) : 0;
@@ -346,8 +367,8 @@ function calcSalary(
     incomeTax +
     inputs.houseRent +
     inputs.electricityCharges +
-    inputs.lwf +
-    inputs.vpf +
+    lwf +
+    vpf +
     inputs.lic +
     inputs.festival +
     inputs.security +
@@ -356,29 +377,33 @@ function calcSalary(
   const netEarnings = grossEarnings - totalDeductions;
 
   return {
-    employeeId: emp.employeeId,
-    basicPay: adjustedBasic,
-    lwp: inputs.lwpPrev + inputs.lwpCurr,
-    lwpPrev: inputs.lwpPrev,
-    lwpCurr: inputs.lwpCurr,
-    specialPay: inputs.specialPay,
+    employeeId: emp.id,
+    basicSalary: adjustedBasic,
+    lwp: lwpPrev + lwpCurr,
+    lwpPrev,
+    lwpCurr,
+    specialPay,
     daPercent: inputs.daPercent,
     hraPercent: inputs.hraPercent,
+    da,
+    hra,
     bonus: inputs.bonus,
-    daArrears: inputs.daArrears,
+    daArrears,
+    arrears: isRegular ? 0 : inputs.arrears,
     ta,
     conveyanceAllowance: inputs.conveyanceAllowance,
     washingAllowance: inputs.washingAllowance,
-    ltc: inputs.ltc,
+    ltc,
     festivalAdvance: inputs.festivalAdvance,
     incentive: inputs.incentive,
     otherEarnings: inputs.otherEarnings,
     grossEarnings,
+    grossSalary: grossEarnings,
     houseRent: inputs.houseRent,
     electricityCharges: inputs.electricityCharges,
-    lwf: inputs.lwf,
+    lwf,
     epf,
-    vpf: inputs.vpf,
+    vpf,
     lic: inputs.lic,
     profTax,
     incomeTax,
@@ -388,47 +413,34 @@ function calcSalary(
     otherDeductions: inputs.otherDeductions,
     totalDeductions,
     netEarnings,
-    da,
-    hra,
-    gross: grossEarnings,
+    netSalary: netEarnings,
     pf: epf,
     esic: esi,
     pt: profTax,
-    it: incomeTax,
-    net: netEarnings,
     employmentType: emp.employmentType,
   };
 }
 
-function getEmployees(): Employee[] {
-  try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
-  } catch {
-    return [];
-  }
-}
 function getSalaries(): SalaryRecord[] {
   try {
-    return JSON.parse(localStorage.getItem("salaries") || "[]");
+    return JSON.parse(localStorage.getItem("sms_salary") || "[]");
   } catch {
     return [];
   }
 }
 function saveSalaries(data: SalaryRecord[]) {
-  localStorage.setItem("salaries", JSON.stringify(data));
+  const serialized = JSON.stringify(data);
+  localStorage.setItem("sms_salary", serialized);
+  try {
+    const { syncKeyToBackend } = require("../services/backendSync");
+    syncKeyToBackend("sms_salary", serialized);
+  } catch {
+    // ignore
+  }
 }
 function getAttendance() {
   try {
-    return JSON.parse(localStorage.getItem("attendance") || "[]");
-  } catch {
-    return [];
-  }
-}
-function getInstitutes(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem("institutes") || "[]").map(
-      (i: { name: string }) => i.name,
-    );
+    return JSON.parse(localStorage.getItem("sms_attendance") || "[]");
   } catch {
     return [];
   }
@@ -472,123 +484,146 @@ function NumInput({
   );
 }
 
+/** Inline prefix + read-only amount field */
+function PrefixReadOnly({
+  label,
+  prefix,
+  value,
+}: {
+  label: string;
+  prefix: string;
+  value: number;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[10px] text-muted-foreground">{label}</Label>
+      <div className="flex items-center gap-0">
+        <div className="h-7 px-2 flex items-center rounded-l border border-r-0 border-border/60 bg-muted/50 text-[10px] text-muted-foreground font-mono whitespace-nowrap">
+          {prefix}
+        </div>
+        <Input
+          type="number"
+          value={value || ""}
+          readOnly
+          className="h-7 text-xs rounded-l-none opacity-70 cursor-default bg-card/30 flex-1 min-w-0"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SalaryProcessingPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
-  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
+  const [selectedSession, setSelectedSession] = useState(getCurrentSession());
   const [selectedInstitute, setSelectedInstitute] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState("all");
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [salaryInputs, setSalaryInputs] = useState<
     Record<string, SalaryInputs>
   >({});
+  const [lwpState, setLwpState] = useState<
+    Record<string, { lwpPrev: number; lwpCurr: number }>
+  >({});
 
-  const employees = getEmployees();
-  const institutes = getInstitutes();
+  const employees = localGetAllEmployees();
+  const institutes = localGetAllInstitutes();
   const attendance = getAttendance();
   const salaries = getSalaries();
+  const sessionList = getSessionList();
 
   const selectedMonthNum = MONTHS.indexOf(selectedMonth) + 1;
-  const selectedYearNum = Number(selectedYear);
+  const selectedYearNum = getYearFromSession(selectedSession, selectedMonthNum);
 
   const isCurrentMonth =
     selectedMonth === MONTHS[now.getMonth()] &&
-    selectedYear === String(now.getFullYear());
+    selectedYearNum === now.getFullYear();
   const isPast =
     !isCurrentMonth &&
-    (Number(selectedYear) < now.getFullYear() ||
-      (Number(selectedYear) === now.getFullYear() &&
+    (selectedYearNum < now.getFullYear() ||
+      (selectedYearNum === now.getFullYear() &&
         MONTHS.indexOf(selectedMonth) < now.getMonth()));
 
   const instituteEmployees = employees.filter(
-    (e) => selectedInstitute === "all" || e.institute === selectedInstitute,
+    (e) =>
+      selectedInstitute === "all" ||
+      e.instituteId === Number(selectedInstitute),
   );
 
   const filteredEmployees =
     selectedEmployee === "all"
       ? instituteEmployees
-      : instituteEmployees.filter((e) => e.id === selectedEmployee);
+      : instituteEmployees.filter((e) => String(e.id) === selectedEmployee);
 
-  const prevMonthIdx =
-    MONTHS.indexOf(selectedMonth) === 0
-      ? 11
-      : MONTHS.indexOf(selectedMonth) - 1;
-  const prevMonthYear =
-    MONTHS.indexOf(selectedMonth) === 0
-      ? String(Number(selectedYear) - 1)
-      : selectedYear;
-  const prevMonth = MONTHS[prevMonthIdx];
+  const prevMonthNum = selectedMonthNum === 1 ? 12 : selectedMonthNum - 1;
+  const prevYearNum =
+    selectedMonthNum === 1 ? selectedYearNum - 1 : selectedYearNum;
 
-  function getAttendanceDays(empId: string): string[] {
+  function getAttendanceDays(empId: number): string[] {
     const rec = attendance.find(
       (a: {
-        employeeId: string | number;
-        month: string | number;
-        year: string | number;
+        employeeId: number;
+        month: number;
+        year: number;
         days: string[];
       }) =>
-        String(a.employeeId) === String(empId) &&
-        Number(a.month) === selectedMonthNum &&
-        Number(a.year) === selectedYearNum,
+        a.employeeId === empId &&
+        a.month === selectedMonthNum &&
+        a.year === selectedYearNum,
     );
     return rec?.days || [];
   }
 
-  function getPrevMonthSalary(empId: string) {
+  function getPrevMonthSalary(empId: number) {
     return salaries.find(
       (s: SalaryRecord) =>
         s.employeeId === empId &&
-        s.month === prevMonth &&
-        s.year === prevMonthYear,
+        s.month === prevMonthNum &&
+        s.year === prevYearNum,
     );
   }
 
-  function isAttendanceSaved(empId: string) {
+  function isAttendanceSaved(empId: number) {
     return attendance.some(
-      (a: {
-        employeeId: string | number;
-        month: string | number;
-        year: string | number;
-      }) =>
-        String(a.employeeId) === String(empId) &&
-        Number(a.month) === selectedMonthNum &&
-        Number(a.year) === selectedYearNum,
+      (a: { employeeId: number; month: number; year: number }) =>
+        a.employeeId === empId &&
+        a.month === selectedMonthNum &&
+        a.year === selectedYearNum,
     );
   }
 
-  function getSavedSalary(empId: string) {
+  function getSavedSalary(empId: number) {
     return salaries.find(
-      (s) =>
+      (s: SalaryRecord) =>
         s.employeeId === empId &&
-        s.month === selectedMonth &&
-        s.year === selectedYear,
+        s.month === selectedMonthNum &&
+        s.year === selectedYearNum,
     );
   }
 
-  function getInputs(emp: Employee): SalaryInputs {
-    return salaryInputs[emp.employeeId] ?? defaultInputs(emp);
+  function getInputs(emp: LocalEmployee): SalaryInputs {
+    return salaryInputs[String(emp.id)] ?? defaultInputs(emp);
   }
 
   function setInputField(
-    empId: string,
+    empKey: string,
     field: keyof SalaryInputs,
     value: number,
   ) {
     setSalaryInputs((prev) => {
+      const emp = employees.find((e) => String(e.id) === empKey);
       const current =
-        prev[empId] ??
-        defaultInputs(employees.find((e) => e.employeeId === empId)!);
-      const updated = { ...current, [field]: value };
-      // Keep lwp in sync as sum of lwpPrev + lwpCurr
-      if (field === "lwpPrev" || field === "lwpCurr") {
-        updated.lwp = updated.lwpPrev + updated.lwpCurr;
-      }
-      return { ...prev, [empId]: updated };
+        prev[empKey] ?? (emp ? defaultInputs(emp) : ({} as SalaryInputs));
+      return { ...prev, [empKey]: { ...current, [field]: value } };
     });
   }
 
-  function expandEmployee(empId: string) {
+  function getLwp(empId: number) {
+    return lwpState[String(empId)] ?? { lwpPrev: 0, lwpCurr: 0 };
+  }
+
+  function expandEmployee(empId: number) {
     const days = getAttendanceDays(empId);
     if (days.length > 0) {
       const { lwpPrev, lwpCurr } = calculateLWPFromAttendance(
@@ -596,43 +631,41 @@ export default function SalaryProcessingPage() {
         selectedMonthNum,
         selectedYearNum,
       );
-      setSalaryInputs((prev) => {
-        const emp = employees.find((e) => e.employeeId === empId);
-        const base =
-          prev[empId] ?? (emp ? defaultInputs(emp) : ({} as SalaryInputs));
-        return {
-          ...prev,
-          [empId]: {
-            ...base,
-            lwpPrev,
-            lwpCurr,
-            lwp: lwpPrev + lwpCurr,
-          },
-        };
-      });
+      setLwpState((prev) => ({
+        ...prev,
+        [String(empId)]: { lwpPrev, lwpCurr },
+      }));
     }
-    setExpandedEmp(empId);
+    setExpandedEmp(String(empId));
   }
 
-  function handleProcess(emp: Employee) {
-    if (!isAttendanceSaved(emp.employeeId)) {
+  function handleProcess(emp: LocalEmployee) {
+    if (!isAttendanceSaved(emp.id)) {
       toast.error("Save attendance first before processing salary.");
       return;
     }
     const inputs = getInputs(emp);
-    const calc = calcSalary(emp, inputs, selectedMonthNum, selectedYearNum);
+    const { lwpPrev, lwpCurr } = getLwp(emp.id);
+    const calc = calcSalary(
+      emp,
+      inputs,
+      lwpPrev,
+      lwpCurr,
+      selectedMonthNum,
+      selectedYearNum,
+    );
     const newRecord: SalaryRecord = {
       ...calc,
-      month: selectedMonth,
-      year: selectedYear,
-      locked: true,
+      month: selectedMonthNum,
+      year: selectedYearNum,
+      isLocked: true,
     };
     const updated = salaries.filter(
-      (s) =>
+      (s: SalaryRecord) =>
         !(
-          s.employeeId === emp.employeeId &&
-          s.month === selectedMonth &&
-          s.year === selectedYear
+          s.employeeId === emp.id &&
+          s.month === selectedMonthNum &&
+          s.year === selectedYearNum
         ),
     );
     updated.push(newRecord);
@@ -641,13 +674,13 @@ export default function SalaryProcessingPage() {
     setExpandedEmp(null);
   }
 
-  function handleDelete(empId: string) {
+  function handleDelete(empId: number) {
     const updated = salaries.filter(
-      (s) =>
+      (s: SalaryRecord) =>
         !(
           s.employeeId === empId &&
-          s.month === selectedMonth &&
-          s.year === selectedYear
+          s.month === selectedMonthNum &&
+          s.year === selectedYearNum
         ),
     );
     saveSalaries(updated);
@@ -656,6 +689,8 @@ export default function SalaryProcessingPage() {
   }
 
   const fmt = (n: number) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+
+  const instituteMap = new Map(institutes.map((i) => [i.id, i.name]));
 
   return (
     <div className="space-y-6">
@@ -683,11 +718,11 @@ export default function SalaryProcessingPage() {
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="Institute" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
-                <SelectItem key={inst} value={inst}>
-                  {inst}
+                <SelectItem key={inst.id} value={String(inst.id)}>
+                  {inst.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -697,10 +732,10 @@ export default function SalaryProcessingPage() {
               <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="All Employees" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Employees</SelectItem>
               {instituteEmployees.map((emp) => (
-                <SelectItem key={emp.id} value={emp.id}>
+                <SelectItem key={emp.id} value={String(emp.id)}>
                   {emp.name}
                 </SelectItem>
               ))}
@@ -711,7 +746,7 @@ export default function SalaryProcessingPage() {
               <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               {getSessionMonthNames().map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
@@ -719,14 +754,14 @@ export default function SalaryProcessingPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-24 h-9">
+          <Select value={selectedSession} onValueChange={setSelectedSession}>
+            <SelectTrigger className="w-28 h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {sessionList.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -763,21 +798,47 @@ export default function SalaryProcessingPage() {
       ) : (
         <div className="space-y-3">
           {filteredEmployees.map((emp) => {
-            const saved = getSavedSalary(emp.employeeId);
-            const isLocked = !!saved?.locked;
-            const attSaved = isAttendanceSaved(emp.employeeId);
+            const saved = getSavedSalary(emp.id);
+            const isLocked = !!saved?.isLocked;
+            const attSaved = isAttendanceSaved(emp.id);
             const inputs = getInputs(emp);
+            const { lwpPrev, lwpCurr } = getLwp(emp.id);
             const preview = calcSalary(
               emp,
               inputs,
+              lwpPrev,
+              lwpCurr,
               selectedMonthNum,
               selectedYearNum,
             );
-            const isExpanded = expandedEmp === emp.employeeId;
+            const isExpanded = expandedEmp === String(emp.id);
+            const empKey = String(emp.id);
+            const instituteName = instituteMap.get(emp.instituteId) ?? "—";
+            const isTemporary = emp.employmentType !== "regular";
+            const extra = getEmpExtra(emp.employeeId);
+            const displayDesignation = extra.designation || emp.designation;
+            const empVpfMode = extra.vpfMode || "percent";
+            const empVpfValue = Number(extra.vpfValue || 0);
+
+            // LWP deduction amount
+            const prevMonth2 =
+              selectedMonthNum === 1 ? 12 : selectedMonthNum - 1;
+            const prevYear2 =
+              selectedMonthNum === 1 ? selectedYearNum - 1 : selectedYearNum;
+            const totalPrevDays = getDaysInMonthUtil(prevMonth2, prevYear2);
+            const totalCurrDays = getDaysInMonthUtil(
+              selectedMonthNum,
+              selectedYearNum,
+            );
+            const basic = Number(emp.basicSalary) || 0;
+            const lwpDeductionAmount = Math.round(
+              (basic * lwpPrev) / totalPrevDays +
+                (basic * lwpCurr) / totalCurrDays,
+            );
 
             return (
               <Card
-                key={emp.employeeId}
+                key={emp.id}
                 className={`card-glass ${
                   isLocked
                     ? "border-green-500/30"
@@ -827,26 +888,26 @@ export default function SalaryProcessingPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
-                      {emp.designation} | {emp.department} | {emp.institute}
+                      {displayDesignation} | {instituteName}
                     </p>
                     {isLocked && saved && (
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-muted-foreground">
                           Basic:{" "}
                           <strong className="text-foreground">
-                            {fmt(saved.basicPay ?? 0)}
+                            {fmt(saved.basicSalary ?? 0)}
                           </strong>
                         </span>
                         <span className="text-muted-foreground">
                           Gross:{" "}
                           <strong className="text-blue-400">
-                            {fmt(saved.grossEarnings ?? saved.gross ?? 0)}
+                            {fmt(saved.grossEarnings ?? 0)}
                           </strong>
                         </span>
                         <span className="text-muted-foreground">
                           Net:{" "}
                           <strong className="text-green-400">
-                            {fmt(saved.netEarnings ?? saved.net ?? 0)}
+                            {fmt(saved.netEarnings ?? 0)}
                           </strong>
                         </span>
                       </div>
@@ -861,7 +922,7 @@ export default function SalaryProcessingPage() {
                         <span>
                           Basic:{" "}
                           <strong className="text-foreground">
-                            {fmt(preview.basicPay)}
+                            {fmt(preview.basicSalary)}
                           </strong>
                         </span>
                         <span className="text-blue-400">
@@ -874,8 +935,8 @@ export default function SalaryProcessingPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         {(() => {
-                          const prevSal = getPrevMonthSalary(emp.employeeId);
-                          const hasCurrent = !!getSavedSalary(emp.employeeId);
+                          const prevSal = getPrevMonthSalary(emp.id);
+                          const hasCurrent = !!getSavedSalary(emp.id);
                           if (attSaved && prevSal && !hasCurrent) {
                             return (
                               <Button
@@ -885,10 +946,7 @@ export default function SalaryProcessingPage() {
                                 onClick={() => {
                                   setSalaryInputs((prev) => ({
                                     ...prev,
-                                    [emp.employeeId]: {
-                                      lwp: 0,
-                                      lwpPrev: 0,
-                                      lwpCurr: 0,
+                                    [empKey]: {
                                       specialPay: prevSal.specialPay ?? 0,
                                       daPercent:
                                         prevSal.daPercent ??
@@ -902,6 +960,7 @@ export default function SalaryProcessingPage() {
                                           : 0),
                                       bonus: prevSal.bonus ?? 0,
                                       daArrears: prevSal.daArrears ?? 0,
+                                      arrears: prevSal.arrears ?? 0,
                                       ta: prevSal.ta ?? 0,
                                       conveyanceAllowance:
                                         prevSal.conveyanceAllowance ?? 0,
@@ -915,8 +974,6 @@ export default function SalaryProcessingPage() {
                                       houseRent: prevSal.houseRent ?? 0,
                                       electricityCharges:
                                         prevSal.electricityCharges ?? 0,
-                                      lwf: prevSal.lwf ?? 0,
-                                      vpf: prevSal.vpf ?? 0,
                                       lic: prevSal.lic ?? 0,
                                       festival: prevSal.festival ?? 0,
                                       security: prevSal.security ?? 0,
@@ -924,7 +981,7 @@ export default function SalaryProcessingPage() {
                                         prevSal.otherDeductions ?? 0,
                                     },
                                   }));
-                                  expandEmployee(emp.employeeId);
+                                  expandEmployee(emp.id);
                                   toast.success(
                                     "Previous month salary loaded. You can edit before saving.",
                                   );
@@ -940,7 +997,7 @@ export default function SalaryProcessingPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs gap-1"
-                          onClick={() => expandEmployee(emp.employeeId)}
+                          onClick={() => expandEmployee(emp.id)}
                         >
                           <ChevronDown className="w-3 h-3" /> Process
                         </Button>
@@ -956,7 +1013,7 @@ export default function SalaryProcessingPage() {
                         </p>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const prevSal = getPrevMonthSalary(emp.employeeId);
+                            const prevSal = getPrevMonthSalary(emp.id);
                             if (prevSal && !isPast) {
                               return (
                                 <Button
@@ -966,10 +1023,7 @@ export default function SalaryProcessingPage() {
                                   onClick={() => {
                                     setSalaryInputs((prev) => ({
                                       ...prev,
-                                      [emp.employeeId]: {
-                                        lwp: 0,
-                                        lwpPrev: 0,
-                                        lwpCurr: 0,
+                                      [empKey]: {
                                         specialPay: prevSal.specialPay ?? 0,
                                         daPercent:
                                           prevSal.daPercent ??
@@ -983,6 +1037,7 @@ export default function SalaryProcessingPage() {
                                             : 0),
                                         bonus: prevSal.bonus ?? 0,
                                         daArrears: prevSal.daArrears ?? 0,
+                                        arrears: prevSal.arrears ?? 0,
                                         ta: prevSal.ta ?? 0,
                                         conveyanceAllowance:
                                           prevSal.conveyanceAllowance ?? 0,
@@ -997,8 +1052,6 @@ export default function SalaryProcessingPage() {
                                         houseRent: prevSal.houseRent ?? 0,
                                         electricityCharges:
                                           prevSal.electricityCharges ?? 0,
-                                        lwf: prevSal.lwf ?? 0,
-                                        vpf: prevSal.vpf ?? 0,
                                         lic: prevSal.lic ?? 0,
                                         festival: prevSal.festival ?? 0,
                                         security: prevSal.security ?? 0,
@@ -1037,134 +1090,125 @@ export default function SalaryProcessingPage() {
                           <TrendingUp className="w-3 h-3" /> Earnings
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                          {/* Basic - from salary details (read-only) */}
                           <NumInput
                             label="Basic Pay"
-                            value={preview.basicPay}
+                            value={preview.basicSalary}
                             readOnly
                           />
-                          <NumInput
-                            label="LWP Prev Month"
-                            value={inputs.lwpPrev}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "lwpPrev", v)
-                            }
-                          />
-                          <NumInput
-                            label="LWP Curr Month"
-                            value={inputs.lwpCurr}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "lwpCurr", v)
-                            }
-                          />
-                          <NumInput
-                            label="Total LWP Days"
-                            value={inputs.lwpPrev + inputs.lwpCurr}
-                            readOnly
-                          />
-                          <NumInput
-                            label="Special Pay"
-                            value={inputs.specialPay}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "specialPay", v)
-                            }
-                          />
-                          <NumInput
-                            label="DA %"
-                            value={inputs.daPercent}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "daPercent", v)
-                            }
-                          />
-                          <NumInput
-                            label="DA Amount"
-                            value={preview.da ?? 0}
-                            readOnly
-                          />
-                          <NumInput
-                            label="HRA %"
-                            value={inputs.hraPercent}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "hraPercent", v)
-                            }
-                          />
-                          <NumInput
-                            label="HRA Amount"
-                            value={preview.hra ?? 0}
-                            readOnly
-                          />
-                          <NumInput
-                            label="TA"
-                            value={inputs.ta}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "ta", v)
-                            }
-                          />
+
+                          {/* LWP deduction display */}
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              LWP Deduction
+                              {(lwpPrev > 0 || lwpCurr > 0) && (
+                                <span className="ml-1 opacity-70">
+                                  ({lwpPrev}p+{lwpCurr}c days)
+                                </span>
+                              )}
+                            </Label>
+                            <div className="h-7 px-2 flex items-center rounded border border-red-500/40 bg-card/30">
+                              <span className="text-xs font-bold text-red-500">
+                                {lwpDeductionAmount > 0
+                                  ? `-${fmt(lwpDeductionAmount)}`
+                                  : "₹0"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Regular-only fields */}
+                          {!isTemporary && (
+                            <>
+                              <NumInput
+                                label="Special Pay"
+                                value={inputs.specialPay}
+                                onChange={(v) =>
+                                  setInputField(empKey, "specialPay", v)
+                                }
+                              />
+                              {/* DA with inline % prefix */}
+                              <PrefixReadOnly
+                                label="DA"
+                                prefix={`${inputs.daPercent}%`}
+                                value={preview.da ?? 0}
+                              />
+                              {/* HRA with inline % prefix */}
+                              <PrefixReadOnly
+                                label="HRA"
+                                prefix={`${inputs.hraPercent}%`}
+                                value={preview.hra ?? 0}
+                              />
+                              <NumInput
+                                label="TA"
+                                value={inputs.ta}
+                                onChange={(v) => setInputField(empKey, "ta", v)}
+                              />
+                              <NumInput
+                                label="LTC"
+                                value={inputs.ltc}
+                                onChange={(v) =>
+                                  setInputField(empKey, "ltc", v)
+                                }
+                              />
+                              <NumInput
+                                label="DA Arrears"
+                                value={inputs.daArrears}
+                                onChange={(v) =>
+                                  setInputField(empKey, "daArrears", v)
+                                }
+                              />
+                            </>
+                          )}
+
+                          {/* Temporary-only: Arrears */}
+                          {isTemporary && (
+                            <NumInput
+                              label="Arrears"
+                              value={inputs.arrears}
+                              onChange={(v) =>
+                                setInputField(empKey, "arrears", v)
+                              }
+                            />
+                          )}
+
                           <NumInput
                             label="Conveyance"
                             value={inputs.conveyanceAllowance}
                             onChange={(v) =>
-                              setInputField(
-                                emp.employeeId,
-                                "conveyanceAllowance",
-                                v,
-                              )
+                              setInputField(empKey, "conveyanceAllowance", v)
                             }
                           />
                           <NumInput
                             label="Washing Allow."
                             value={inputs.washingAllowance}
                             onChange={(v) =>
-                              setInputField(
-                                emp.employeeId,
-                                "washingAllowance",
-                                v,
-                              )
+                              setInputField(empKey, "washingAllowance", v)
                             }
                           />
                           <NumInput
                             label="Bonus"
                             value={inputs.bonus}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "bonus", v)
-                            }
-                          />
-                          <NumInput
-                            label="DA Arrears"
-                            value={inputs.daArrears}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "daArrears", v)
-                            }
-                          />
-                          <NumInput
-                            label="LTC"
-                            value={inputs.ltc}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "ltc", v)
-                            }
+                            onChange={(v) => setInputField(empKey, "bonus", v)}
                           />
                           <NumInput
                             label="Festival Adv."
                             value={inputs.festivalAdvance}
                             onChange={(v) =>
-                              setInputField(
-                                emp.employeeId,
-                                "festivalAdvance",
-                                v,
-                              )
+                              setInputField(empKey, "festivalAdvance", v)
                             }
                           />
                           <NumInput
                             label="Incentive"
                             value={inputs.incentive}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "incentive", v)
+                              setInputField(empKey, "incentive", v)
                             }
                           />
                           <NumInput
                             label="Other Earnings"
                             value={inputs.otherEarnings}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "otherEarnings", v)
+                              setInputField(empKey, "otherEarnings", v)
                             }
                           />
                           <NumInput
@@ -1189,84 +1233,117 @@ export default function SalaryProcessingPage() {
                             label="House Rent"
                             value={inputs.houseRent}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "houseRent", v)
+                              setInputField(empKey, "houseRent", v)
                             }
                           />
                           <NumInput
                             label="Electricity"
                             value={inputs.electricityCharges}
                             onChange={(v) =>
-                              setInputField(
-                                emp.employeeId,
-                                "electricityCharges",
-                                v,
-                              )
+                              setInputField(empKey, "electricityCharges", v)
                             }
                           />
-                          <NumInput
-                            label="LWF"
-                            value={inputs.lwf}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "lwf", v)
-                            }
-                          />
-                          <NumInput
-                            label={`EPF (12%) = ${fmt(preview.epf)}`}
+
+                          {/* LWF: auto from config */}
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              LWF
+                            </Label>
+                            <div className="h-7 px-2 flex items-center rounded border border-border/40 bg-card/30">
+                              {(() => {
+                                const lwfCfg = getLWFConfig();
+                                const lwfAmt = lwfCfg.months.includes(
+                                  selectedMonthNum,
+                                )
+                                  ? lwfCfg.amount
+                                  : 0;
+                                return lwfAmt > 0 ? (
+                                  <span className="text-xs text-amber-400 font-semibold">
+                                    ₹{lwfAmt} (auto)
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    ₹0 (not applicable)
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* EPF with inline % prefix */}
+                          <PrefixReadOnly
+                            label="EPF"
+                            prefix="12%"
                             value={preview.epf}
-                            readOnly
                           />
-                          <NumInput
-                            label="VPF"
-                            value={inputs.vpf}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "vpf", v)
-                            }
-                          />
+
+                          {/* VPF from salary details */}
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              VPF
+                            </Label>
+                            <div className="flex items-center gap-0">
+                              <div className="h-7 px-2 flex items-center rounded-l border border-r-0 border-border/60 bg-muted/50 text-[10px] text-muted-foreground font-mono whitespace-nowrap">
+                                {empVpfMode === "percent"
+                                  ? `${empVpfValue}%`
+                                  : "₹"}
+                              </div>
+                              <Input
+                                type="number"
+                                value={preview.vpf || ""}
+                                readOnly
+                                className="h-7 text-xs rounded-l-none opacity-70 cursor-default bg-card/30 flex-1 min-w-0"
+                              />
+                            </div>
+                          </div>
+
                           <NumInput
                             label="LIC"
                             value={inputs.lic}
-                            onChange={(v) =>
-                              setInputField(emp.employeeId, "lic", v)
-                            }
+                            onChange={(v) => setInputField(empKey, "lic", v)}
                           />
-                          <NumInput
-                            label={`Prof. Tax = ${fmt(preview.profTax)}`}
+
+                          {/* Prof Tax */}
+                          <PrefixReadOnly
+                            label="Prof. Tax"
+                            prefix="PT"
                             value={preview.profTax}
-                            readOnly
                           />
-                          <NumInput
-                            label={`Income Tax = ${fmt(preview.incomeTax)}`}
+
+                          {/* Income Tax */}
+                          <PrefixReadOnly
+                            label="Income Tax"
+                            prefix="IT"
                             value={preview.incomeTax}
-                            readOnly
                           />
+
                           <NumInput
                             label="Festival"
                             value={inputs.festival}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "festival", v)
+                              setInputField(empKey, "festival", v)
                             }
                           />
-                          <NumInput
-                            label={`ESI (0.75%) = ${fmt(preview.esi)}`}
+
+                          {/* ESIC with inline % prefix */}
+                          <PrefixReadOnly
+                            label="ESIC"
+                            prefix="0.75%"
                             value={preview.esi}
-                            readOnly
                           />
+
                           <NumInput
                             label="Security"
                             value={inputs.security}
                             onChange={(v) =>
-                              setInputField(emp.employeeId, "security", v)
+                              setInputField(empKey, "security", v)
                             }
                           />
                           <NumInput
                             label="Other Deductions"
                             value={inputs.otherDeductions}
                             onChange={(v) =>
-                              setInputField(
-                                emp.employeeId,
-                                "otherDeductions",
-                                v,
-                              )
+                              setInputField(empKey, "otherDeductions", v)
                             }
                           />
                           <NumInput
@@ -1349,7 +1426,7 @@ export default function SalaryProcessingPage() {
                         size="sm"
                         variant="outline"
                         className="h-8 text-xs gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                        onClick={() => setDeleteTarget(emp.employeeId)}
+                        onClick={() => setDeleteTarget(emp.id)}
                       >
                         <Unlock className="w-3 h-3" /> Delete &amp; Unlock
                       </Button>
@@ -1387,7 +1464,9 @@ export default function SalaryProcessingPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-500 hover:bg-red-600"
-              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              onClick={() =>
+                deleteTarget !== null && handleDelete(deleteTarget)
+              }
             >
               Delete
             </AlertDialogAction>

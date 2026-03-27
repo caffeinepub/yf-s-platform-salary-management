@@ -1,37 +1,39 @@
-# Yf's Platform - Salary Management System
+# Yf's Platform - Salary Management
 
 ## Current State
-The app has a Motoko backend and React frontend. However, ALL data (institutes, employees, attendance, salary, daily workers, credentials, settings) is stored in **browser localStorage** — not in the backend canister. This causes data to be device-specific: data added on mobile is invisible on PC and vice versa. Additionally, month/year selectors in Reports, SalaryProcessing, and Payslip pages are ordered oldest-to-newest and start from 2020 instead of 2001.
+SalaryDetailsPage has Basic and TA fields per employee stored in empExtra/backend.
+SalaryProcessingPage has manual lwpPrev/lwpCurr/totalLWP inputs, shows DA%+DA amount as separate inputs, same for HRA%, and VPF is a plain manual amount input. All employee types see same earnings fields. LWF is manual. VPF is not in salary details.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Comprehensive Motoko backend storage for all entities: institutes, employees (with all 27+ fields), attendance (with leave types), salary (with all 30+ fields), daily workers (with status), employee credentials, admin password, salary config, promotion history
-- `deleteAttendance` and `deleteSalary` backend methods
-- Salary save/lock/delete in backend (currently only `processSalary` exists)
-- Backend methods for employee credentials CRUD
-- Backend methods for salary config and admin password
-- Backend methods for promotion history
+- Salary Details: VPF field with mode toggle — `%` (percent of basic) or fixed amount. Store `vpfMode` ('percent'|'fixed') and `vpfValue` in empExtra.
+- Salary Processing: LWP Amount display — auto-calculated from attendance, shown in red with negative sign. Replace prev/curr/total LWP day inputs.
+- Salary Processing: Arrears input for temporary employees (shown instead of DA Arrears).
+- Salary Processing: LWF auto-deducted ₹10 in June and December only (no manual input, just auto-filled).
 
 ### Modify
-- `Employee` Motoko type: use Text for designation and employmentType (to support 151 designations); add all extended fields (department, religion, gender, category, employeeStatus, phone, emailId, bankName, bankBranch, bankAccountNo, ifscCode, panNo, pfNumber, esiNumber, aadhaarNo, uanNo, licNo, ta, bhelQuarter, profilePic)
-- `SalaryRecord` Motoko type: add all extended fields (ta, specialPay, lwp, daPercent, hraPercent, conveyanceAllowance, washingAllowance, ltc, festivalAdvance, incentive, bonus, daArrears, otherEarnings, houseRent, electricityCharges, lwf, epf, vpf, lic, profTax, incomeTax, festival, esi, security, otherDeductions, netEarnings)
-- `DailyWorker` Motoko type: add status field
-- `useQueries.ts`: replace all `localStore` calls with actual backend actor calls via `useActor`
-- `localStore.ts`: keep only as fallback/migration bridge, main operations go to backend
-- All pages that directly read from `localStorage` (DashboardPage, SalaryProcessingPage, ReportsPage, DailyWorkersPage, SettingsPage, LoginPage, EmployeeProfilePage, EmployeeSalarySlipsPage, EmployeeDashboardPage): rewrite to use hooks/actor instead
-- `YEARS` array in Reports, SalaryProcessing, Payslip pages: change to start from 2001 and sort newest-to-oldest (same as AttendancePage)
-- `getSessionMonths()` in Reports, SalaryProcessing, Payslip pages: ensure `.reverse()` is applied
+- Salary Details table: add VPF column with mode toggle (% / fixed) and value input.
+- Salary Processing: Basic auto-populated from salary details (already stored in emp.basicSalary + empExtra).
+- Salary Processing: Remove lwpPrev, lwpCurr, totalLWP editable inputs. Instead show single read-only "LWP Deduction" amount in red with negative sign (auto-calculated from attendance).
+- Salary Processing earnings: Special Pay, DA, HRA, TA, LTC, DA Arrears — hide for temporary employees.
+- Salary Processing: DA, HRA, EPF, ESIC, VPF — use inline locked-% prefix box + auto-calculated read-only amount (like phone country code pattern). User cannot edit % inline; % comes from fixed rates (DA=257%, HRA=20%, EPF=12%, ESIC=0.75%) or from empExtra for VPF.
+- Salary Processing: VPF calculated automatically from empExtra vpfMode/vpfValue.
+- Salary Processing: EPF, ESIC, Professional Tax, Income Tax — already auto-calc, keep as read-only with inline % prefix.
+- Salary Processing: LWF — auto-set to 10 if current month is June or December, else 0 (no manual input).
 
 ### Remove
-- Direct localStorage reads/writes for main data entities from page components
-- Old `empExtra_*` localStorage pattern (merge extra fields into main employee record)
-- `localStore.ts` dependency from `useQueries.ts` (replace with actor calls)
+- Salary Processing: Manual LWP Prev Month, LWP Curr Month, Total LWP Days inputs.
+- Salary Processing: Separate DA% and HRA% editable inputs (% is now shown as locked prefix).
+- Salary Processing: Manual LWF input (now automatic).
 
 ## Implementation Plan
-1. Generate new Motoko backend with comprehensive Employee, Salary, Attendance, DailyWorker, Credentials, Settings types and all CRUD methods
-2. Rewrite `useQueries.ts` to call actor methods asynchronously; remove localStore imports
-3. Update `localStore.ts` to remove — or keep only as migration utility
-4. Rewrite all pages that directly access localStorage to use hooks from useQueries
-5. Fix YEARS and getSessionMonths in Reports, SalaryProcessing, Payslip pages
-6. Validate and deploy
+1. Update `SalaryDetailsPage.tsx`:
+   - Add VPF column: mode toggle button (%/fixed) + value input per employee.
+   - Save vpfMode and vpfValue to empExtra on Save.
+2. Update `SalaryProcessingPage.tsx`:
+   - SalaryInputs type: remove lwpPrev/lwpCurr/lwp manual fields, add lwpAmount (computed). Add arrears for temp. Remove lwf as manual (auto). Remove daPercent/hraPercent as editable.
+   - calcSalary: read vpfMode/vpfValue from empExtra to calculate vpf. Auto-calculate lwf=10 for June/December. Hide special pay/da/hra/ta/ltc/daArrears for temporary; show arrears for temporary instead.
+   - NumInput component: add PercentPrefixInput variant for inline locked-% prefix + auto-calculated amount.
+   - In expanded form: show LWP Deduction as red negative display (not input). Show DA as [257%][calc], HRA as [20%][calc], EPF as [12%][calc], ESIC as [0.75%][calc], VPF as [vpf%][calc] or fixed.
+   - LWF: no input shown; auto-set and displayed as auto-deducted note in June/Dec.

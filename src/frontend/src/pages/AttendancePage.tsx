@@ -34,6 +34,11 @@ import {
   useGetEmployeesForInstitute,
   useSaveAttendance,
 } from "../hooks/useQueries";
+import {
+  getCurrentSession,
+  getSessionList,
+  getYearFromSession,
+} from "../utils/sessionUtils";
 
 const MONTH_NAMES = [
   "January",
@@ -79,12 +84,6 @@ function getSessionMonths(): { value: string; label: string }[] {
   }
   return months.reverse();
 }
-
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from(
-  { length: CURRENT_YEAR - 2000 },
-  (_, i) => CURRENT_YEAR - i,
-);
 
 type DayStatus = "present" | "absent" | "halfday" | "holiday";
 type LeaveType = "LWP" | "CL" | "EL" | "HPL" | "ML" | "PH";
@@ -197,7 +196,8 @@ export default function AttendancePage() {
     "all",
   );
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [session, setSession] = useState(getCurrentSession());
+  const sessionList = getSessionList();
   const [dayStatuses, setDayStatuses] = useState<Record<string, DayData>>({});
   const [dialogDay, setDialogDay] = useState<string | null>(null);
 
@@ -207,10 +207,12 @@ export default function AttendancePage() {
   const specificEmployeeId =
     employeeSelection !== "all" ? employeeSelection : null;
 
+  const derivedYear = getYearFromSession(session, month);
+
   const { data: attendance } = useGetAttendance(
     specificEmployeeId,
     month,
-    year,
+    derivedYear,
   );
   const saveAttendance = useSaveAttendance();
   const deleteAttendance = useDeleteAttendance();
@@ -218,6 +220,7 @@ export default function AttendancePage() {
 
   const isLocked = attendance?.isLocked ?? false;
 
+  const year = derivedYear;
   const periodDays = getPeriodDays(month, year);
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const periodTitle = `Period: 25 ${SHORT_MONTH[prevMonthNum - 1]} – 24 ${SHORT_MONTH[month - 1]} ${year}`;
@@ -286,7 +289,7 @@ export default function AttendancePage() {
       await saveAttendance.mutateAsync({
         employeeId: specificEmployeeId,
         month,
-        year,
+        year: derivedYear,
         days: buildDaysArray(),
       });
       toast.success("Attendance saved and locked");
@@ -393,7 +396,7 @@ export default function AttendancePage() {
           <SelectTrigger data-ocid="attendance.select">
             <SelectValue placeholder="Select Institute" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             {institutes.map((inst) => (
               <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
                 {inst.name}
@@ -415,7 +418,7 @@ export default function AttendancePage() {
           <SelectTrigger data-ocid="attendance.select">
             <SelectValue placeholder="All Employees" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             <SelectItem value="all">All Employees</SelectItem>
             {employees.map((emp) => (
               <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
@@ -432,7 +435,7 @@ export default function AttendancePage() {
           <SelectTrigger data-ocid="attendance.select">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-[250px] overflow-y-auto">
             {getSessionMonths().map((m) => (
               <SelectItem key={m.value} value={m.value}>
                 {m.label}
@@ -441,17 +444,14 @@ export default function AttendancePage() {
           </SelectContent>
         </Select>
 
-        <Select
-          value={year.toString()}
-          onValueChange={(v) => setYear(Number(v))}
-        >
+        <Select value={session} onValueChange={setSession}>
           <SelectTrigger data-ocid="attendance.select">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => (
-              <SelectItem key={y} value={y.toString()}>
-                {y}
+          <SelectContent className="max-h-[250px] overflow-y-auto">
+            {sessionList.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
               </SelectItem>
             ))}
           </SelectContent>
@@ -610,7 +610,7 @@ export default function AttendancePage() {
                             await deleteAttendance.mutateAsync({
                               employeeId: specificEmployeeId,
                               month,
-                              year,
+                              year: derivedYear,
                             });
                             setDayStatuses(buildDefaultStatuses(month, year));
                             setConfirmDelete(false);

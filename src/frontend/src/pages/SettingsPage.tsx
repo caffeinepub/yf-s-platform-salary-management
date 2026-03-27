@@ -441,6 +441,20 @@ function UserPasswordSection() {
   );
 }
 
+type LWFConfig = {
+  amount: number;
+  months: number[];
+};
+const DEFAULT_LWF_CONFIG: LWFConfig = { amount: 10, months: [6, 12] };
+
+function getLWFConfig(): LWFConfig {
+  try {
+    const stored = localStorage.getItem("sms_lwf_config");
+    if (stored) return { ...DEFAULT_LWF_CONFIG, ...JSON.parse(stored) };
+  } catch {}
+  return DEFAULT_LWF_CONFIG;
+}
+
 // ─── Section: Salary Structure Configuration ─────────────────────────────────
 function SalaryConfigSection() {
   const [open, setOpen] = useState(false);
@@ -534,6 +548,148 @@ function SalaryConfigSection() {
               className="gradient-primary"
               onClick={save}
               data-ocid="settings.salary_config.save_button"
+            >
+              Save Configuration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ─── Section: LWF Configuration ─────────────────────────────────────────────
+function LWFConfigSection() {
+  const [open, setOpen] = useState(false);
+  const [config, setConfig] = useState<LWFConfig>(getLWFConfig);
+
+  function save() {
+    localStorage.setItem("sms_lwf_config", JSON.stringify(config));
+    syncKeyToBackend("sms_lwf_config", JSON.stringify(config));
+    toast.success("LWF configuration saved.");
+    setOpen(false);
+  }
+
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  function toggleMonth(m: number) {
+    setConfig((prev) => ({
+      ...prev,
+      months: prev.months.includes(m)
+        ? prev.months.filter((x) => x !== m)
+        : [...prev.months, m],
+    }));
+  }
+
+  return (
+    <>
+      <Card
+        className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+        onClick={() => setOpen(true)}
+        data-ocid="settings.lwf_config.open_modal_button"
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent-foreground">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <CardTitle className="text-sm font-display">
+                LWF Configuration
+              </CardTitle>
+            </div>
+            <Badge
+              variant="secondary"
+              className="text-xs bg-blue-500/20 text-blue-400"
+            >
+              Active
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <CardDescription className="text-xs">
+            Set deduction amount and applicable months
+          </CardDescription>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent data-ocid="settings.lwf_config.dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-4 h-4" /> LWF Configuration
+            </DialogTitle>
+            <DialogDescription>
+              Labour Welfare Fund deduction. Applied automatically in selected
+              months.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">LWF Amount (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={config.amount}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    amount: Number(e.target.value),
+                  }))
+                }
+                className="text-sm"
+                data-ocid="settings.lwf_config.amount.input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Applicable Months</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {monthNames.map((name, i) => {
+                  const m = i + 1;
+                  return (
+                    <label
+                      key={m}
+                      className="flex items-center gap-1.5 cursor-pointer text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={config.months.includes(m)}
+                        onChange={() => toggleMonth(m)}
+                        data-ocid={`settings.lwf_config.month_${m}.checkbox`}
+                        className="rounded"
+                      />
+                      {name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              data-ocid="settings.lwf_config.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="gradient-primary"
+              onClick={save}
+              data-ocid="settings.lwf_config.save_button"
             >
               Save Configuration
             </Button>
@@ -938,6 +1094,7 @@ export default function SettingsPage() {
       >
         <UserPasswordSection />
         <SalaryConfigSection />
+        <LWFConfigSection />
         <BackupRestoreSection />
         <TaxSlabsSection />
         <SystemInfoSection />

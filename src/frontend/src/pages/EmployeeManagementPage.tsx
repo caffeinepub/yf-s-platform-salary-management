@@ -1325,7 +1325,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select institute" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         {institutes.map((i: Institute) => (
                           <SelectItem
                             key={i.id.toString()}
@@ -1349,7 +1349,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         <SelectItem value="yes">Yes</SelectItem>
                         <SelectItem value="no">No</SelectItem>
                       </SelectContent>
@@ -1380,7 +1380,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select religion" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         {[
                           "Hindu",
                           "Muslim",
@@ -1413,7 +1413,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
@@ -1432,7 +1432,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         <SelectItem value="general">General</SelectItem>
                         <SelectItem value="obc">OBC</SelectItem>
                         <SelectItem value="sc">SC</SelectItem>
@@ -1452,7 +1452,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         <SelectItem value={EmploymentType.regular}>
                           Regular
                         </SelectItem>
@@ -1474,7 +1474,7 @@ export default function EmployeeManagementPage() {
                       >
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
                         <SelectItem value="resigned">Resigned</SelectItem>
@@ -1763,7 +1763,7 @@ export default function EmployeeManagementPage() {
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[250px] overflow-y-auto">
                   <SelectItem value="promotion">
                     <span className="flex items-center gap-2">
                       <TrendingUp className="w-3.5 h-3.5" />

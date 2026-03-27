@@ -46,7 +46,10 @@ export default function SalaryDetailsPage() {
   const [instId, setInstId] = useState<string>("all");
   const [selectedEmpId, setSelectedEmpId] = useState<string>("all");
   const [salaryEdits, setSalaryEdits] = useState<
-    Record<string, { basic: string; ta: string }>
+    Record<
+      string,
+      { basic: string; ta: string; vpfMode: string; vpfValue: string }
+    >
   >({});
 
   const effectiveInstId =
@@ -71,33 +74,33 @@ export default function SalaryDetailsPage() {
           (e: Employee) => e.employeeId === selectedEmpId,
         );
 
-  // Reset employee selection when institute changes
   function handleInstChange(val: string) {
     setInstId(val);
     setSelectedEmpId("all");
   }
 
-  function getSalaryEdit(
+  function getEdit(
     empId: string,
-    field: "basic" | "ta",
+    field: "basic" | "ta" | "vpfMode" | "vpfValue",
     fallback: string,
   ) {
     return salaryEdits[empId]?.[field] ?? fallback;
   }
 
-  function setSalaryEditField(
+  function setEditField(
     empId: string,
-    field: "basic" | "ta",
+    field: "basic" | "ta" | "vpfMode" | "vpfValue",
     value: string,
   ) {
-    setSalaryEdits((prev) => ({
-      ...prev,
-      [empId]: {
-        ...{ basic: "0", ta: "0" },
-        ...prev[empId],
-        [field]: value,
-      },
-    }));
+    setSalaryEdits((prev) => {
+      const existing = prev[empId] ?? {
+        basic: "0",
+        ta: "0",
+        vpfMode: "percent",
+        vpfValue: "0",
+      };
+      return { ...prev, [empId]: { ...existing, [field]: value } };
+    });
   }
 
   async function saveSalaryRow(emp: Employee) {
@@ -106,6 +109,10 @@ export default function SalaryDetailsPage() {
         salaryEdits[emp.employeeId]?.basic ?? emp.basicSalary.toString();
       const extra = getEmpExtra(emp.employeeId);
       const ta = salaryEdits[emp.employeeId]?.ta ?? String(extra.ta || "0");
+      const vpfMode =
+        salaryEdits[emp.employeeId]?.vpfMode ?? extra.vpfMode ?? "percent";
+      const vpfValue =
+        salaryEdits[emp.employeeId]?.vpfValue ?? String(extra.vpfValue || "0");
       await updateMutation.mutateAsync({
         id: emp.id,
         name: emp.name,
@@ -118,7 +125,12 @@ export default function SalaryDetailsPage() {
         dob: emp.dob,
         basicSalary: BigInt(basic || "0"),
       });
-      saveEmpExtra(emp.employeeId, { ...extra, ta: Number(ta) || 0 });
+      saveEmpExtra(emp.employeeId, {
+        ...extra,
+        ta: Number(ta) || 0,
+        vpfMode,
+        vpfValue: Number(vpfValue) || 0,
+      });
       toast.success(`Saved salary for ${emp.name}`);
     } catch {
       toast.error("Failed to save salary");
@@ -138,12 +150,11 @@ export default function SalaryDetailsPage() {
             Salary Details
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Set Basic Salary and TA for each employee
+            Set Basic Salary, TA and VPF for each employee
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          {/* Institute Selector */}
           <Select value={instId} onValueChange={handleInstChange}>
             <SelectTrigger
               className="bg-card/60 border-border/60 w-44"
@@ -151,7 +162,7 @@ export default function SalaryDetailsPage() {
             >
               <SelectValue placeholder="All Institutes" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((i: Institute) => (
                 <SelectItem key={i.id.toString()} value={i.id.toString()}>
@@ -160,7 +171,6 @@ export default function SalaryDetailsPage() {
               ))}
             </SelectContent>
           </Select>
-          {/* Employee Selector */}
           <Select
             value={selectedEmpId}
             onValueChange={setSelectedEmpId}
@@ -173,7 +183,7 @@ export default function SalaryDetailsPage() {
               <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="All Employees" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Employees</SelectItem>
               {instituteEmployees.map((emp: Employee) => (
                 <SelectItem key={emp.employeeId} value={emp.employeeId}>
@@ -185,7 +195,6 @@ export default function SalaryDetailsPage() {
         </div>
       </motion.div>
 
-      {/* Content */}
       {isLoading ? (
         <div
           className="flex items-center justify-center py-20"
@@ -243,6 +252,9 @@ export default function SalaryDetailsPage() {
                       <TableHead className="text-xs font-semibold text-muted-foreground w-28">
                         TA (₹)
                       </TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground w-52">
+                        VPF
+                      </TableHead>
                       <TableHead className="text-xs font-semibold text-muted-foreground w-20">
                         Action
                       </TableHead>
@@ -251,21 +263,30 @@ export default function SalaryDetailsPage() {
                   <TableBody>
                     {filteredEmps.map((emp: Employee, idx: number) => {
                       const extra = getEmpExtra(emp.employeeId);
-                      const basicVal = getSalaryEdit(
+                      const basicVal = getEdit(
                         emp.employeeId,
                         "basic",
                         emp.basicSalary.toString(),
                       );
-                      const taVal = getSalaryEdit(
+                      const taVal = getEdit(
                         emp.employeeId,
                         "ta",
                         String(extra.ta || "0"),
+                      );
+                      const vpfMode = getEdit(
+                        emp.employeeId,
+                        "vpfMode",
+                        extra.vpfMode || "percent",
+                      );
+                      const vpfValue = getEdit(
+                        emp.employeeId,
+                        "vpfValue",
+                        String(extra.vpfValue || "0"),
                       );
                       const instName =
                         institutes.find(
                           (i: Institute) => i.id === emp.instituteId,
                         )?.name ?? "—";
-                      // Use extra.designation (human-readable) over backend enum value
                       const displayDesignation =
                         extra.designation || emp.designation;
                       return (
@@ -294,7 +315,7 @@ export default function SalaryDetailsPage() {
                               type="number"
                               value={basicVal}
                               onChange={(e) =>
-                                setSalaryEditField(
+                                setEditField(
                                   emp.employeeId,
                                   "basic",
                                   e.target.value,
@@ -310,7 +331,7 @@ export default function SalaryDetailsPage() {
                               type="number"
                               value={taVal}
                               onChange={(e) =>
-                                setSalaryEditField(
+                                setEditField(
                                   emp.employeeId,
                                   "ta",
                                   e.target.value,
@@ -320,6 +341,47 @@ export default function SalaryDetailsPage() {
                               placeholder="0"
                               data-ocid={`salary_details.ta.input.${idx + 1}`}
                             />
+                          </TableCell>
+                          <TableCell>
+                            {/* VPF: mode toggle + value */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditField(
+                                    emp.employeeId,
+                                    "vpfMode",
+                                    vpfMode === "percent" ? "fixed" : "percent",
+                                  )
+                                }
+                                className="h-8 px-2 text-xs rounded border border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors whitespace-nowrap font-mono font-semibold min-w-[40px]"
+                                title="Toggle between % and fixed amount"
+                                data-ocid={`salary_details.vpf.toggle.${idx + 1}`}
+                              >
+                                {vpfMode === "percent" ? "%" : "₹"}
+                              </button>
+                              <Input
+                                type="number"
+                                value={vpfValue}
+                                onChange={(e) =>
+                                  setEditField(
+                                    emp.employeeId,
+                                    "vpfValue",
+                                    e.target.value,
+                                  )
+                                }
+                                className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
+                                placeholder={
+                                  vpfMode === "percent"
+                                    ? "% of basic"
+                                    : "Fixed ₹"
+                                }
+                                data-ocid={`salary_details.vpf.input.${idx + 1}`}
+                              />
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {vpfMode === "percent" ? "% of basic" : "fixed"}
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Button

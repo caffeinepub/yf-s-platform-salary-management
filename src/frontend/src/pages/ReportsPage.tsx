@@ -50,11 +50,6 @@ const MONTHS = [
   "December",
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2000 }, (_, i) =>
-  String(CURRENT_YEAR - i),
-);
-
 function getCurrentSessionYear() {
   const now = new Date();
   const y = now.getFullYear();
@@ -279,6 +274,12 @@ const REPORT_CATEGORIES = [
     icon: <ShieldCheck className="w-4 h-4" />,
     reports: [
       {
+        id: "pf-register",
+        label: "PF Register",
+        icon: <FileBarChart2 className="w-4 h-4" />,
+        desc: "Institute-wise PF contribution remittance register",
+      },
+      {
         id: "pf-report",
         label: "PF Report (Monthly)",
         icon: <FileBarChart2 className="w-4 h-4" />,
@@ -301,12 +302,6 @@ const REPORT_CATEGORIES = [
         label: "Loan Recovery Report",
         icon: <Receipt className="w-4 h-4" />,
         desc: "PF loan/advance recovery tracking",
-      },
-      {
-        id: "pf-register",
-        label: "PF Register",
-        icon: <FileBarChart2 className="w-4 h-4" />,
-        desc: "Institute-wise PF contribution remittance register",
       },
     ],
   },
@@ -490,12 +485,17 @@ function getSalVal(
 export default function ReportsPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
-  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [selectedInstitute, setSelectedInstitute] = useState("all");
   const [selectedSessionYear, setSelectedSessionYear] = useState(
     getCurrentSessionYear(),
   );
   const [activeCategory, setActiveCategory] = useState("payroll");
+  // Derive calendar year from session and selected month
+  const selectedMonthNum = MONTHS.indexOf(selectedMonth) + 1;
+  const selectedYear = (() => {
+    const startYear = Number.parseInt(selectedSessionYear.split("-")[0], 10);
+    return selectedMonthNum >= 4 ? String(startYear) : String(startYear + 1);
+  })();
   const [generating, setGenerating] = useState<string | null>(null);
 
   const institutes = getInstitutes();
@@ -1815,7 +1815,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="Institute" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
                 <SelectItem key={inst} value={inst}>
@@ -1831,7 +1831,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
             <SelectTrigger className="w-28 h-9">
               <SelectValue placeholder="Session" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               {SESSION_YEAR_LIST.map((y) => (
                 <SelectItem key={y} value={y}>
                   {y}
@@ -1844,22 +1844,10 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
               <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
               {getSessionMonthNames().map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-24 h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
                 </SelectItem>
               ))}
             </SelectContent>
