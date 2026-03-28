@@ -869,10 +869,10 @@ function TaxSlabsSection() {
   const [open, setOpen] = useState(false);
 
   const ptSlabs = [
-    { range: "Below ₹2,25,000", monthly: "₹0", annual: "₹0" },
-    { range: "₹2,25,000 – ₹2,99,999", monthly: "₹125", annual: "₹1,500" },
-    { range: "₹3,00,000 – ₹3,99,999", monthly: "₹167", annual: "₹2,000" },
-    { range: "₹4,00,000 and above", monthly: "₹208", annual: "₹2,500" },
+    { range: "Up to ₹2,25,000", monthly: "₹0", annual: "₹0" },
+    { range: "₹2,25,001 – ₹3,00,000", monthly: "₹125", annual: "₹1,500" },
+    { range: "₹3,00,001 – ₹4,00,000", monthly: "₹167", annual: "₹2,000" },
+    { range: "₹4,00,001 and above", monthly: "₹208", annual: "₹2,500" },
   ];
 
   const itSlabs = [

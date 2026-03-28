@@ -16,13 +16,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Filter, IndianRupee, Loader2, Users } from "lucide-react";
+import { IndianRupee, Loader2, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
   type Employee,
   type Institute,
+  useGetAllEmployees,
   useGetAllInstitutes,
   useGetEmployeesForInstitute,
   useUpdateEmployee,
@@ -48,24 +49,27 @@ export default function SalaryDetailsPage() {
   const [salaryEdits, setSalaryEdits] = useState<
     Record<
       string,
-      { basic: string; ta: string; vpfMode: string; vpfValue: string }
+      {
+        basic: string;
+        ta: string;
+        vpfMode: string;
+        vpfValue: string;
+        licAmounts: string[];
+      }
     >
   >({});
 
-  const effectiveInstId =
-    instId !== "all" ? BigInt(instId) : (institutes[0]?.id ?? null);
-
-  const { data: employees = [], isLoading: loadingEmps } =
-    useGetEmployeesForInstitute(effectiveInstId);
+  const effectiveInstId = instId !== "all" ? BigInt(instId) : null;
 
   const updateMutation = useUpdateEmployee();
 
-  const isLoading = loadingInstitutes || loadingEmps;
+  const { data: allEmployees = [], isLoading: loadingEmps } =
+    useGetAllEmployees();
+  const { data: instEmployees = [] } =
+    useGetEmployeesForInstitute(effectiveInstId);
+  const instituteEmployees = instId === "all" ? allEmployees : instEmployees;
 
-  const instituteEmployees =
-    instId === "all"
-      ? employees
-      : employees.filter((e: Employee) => e.instituteId.toString() === instId);
+  const isLoading = loadingInstitutes || loadingEmps;
 
   const filteredEmps =
     selectedEmpId === "all"
@@ -87,6 +91,40 @@ export default function SalaryDetailsPage() {
     return salaryEdits[empId]?.[field] ?? fallback;
   }
 
+  function getLicAmounts(empId: string, count: number): string[] {
+    const saved = salaryEdits[empId]?.licAmounts;
+    if (saved) return saved;
+    const extra = getEmpExtra(empId);
+    const stored: string[] = Array.isArray(extra.licAmounts)
+      ? extra.licAmounts.map(String)
+      : [];
+    // Ensure array matches length
+    const result = Array.from({ length: count }, (_, i) => stored[i] ?? "0");
+    return result;
+  }
+
+  function setLicAmount(
+    empId: string,
+    idx: number,
+    value: string,
+    count: number,
+  ) {
+    setSalaryEdits((prev) => {
+      const existing = prev[empId] ?? {
+        basic: "0",
+        ta: "0",
+        vpfMode: "percent",
+        vpfValue: "0",
+        licAmounts: Array(count).fill("0"),
+      };
+      const licAmounts = existing.licAmounts
+        ? [...existing.licAmounts]
+        : Array(count).fill("0");
+      licAmounts[idx] = value;
+      return { ...prev, [empId]: { ...existing, licAmounts } };
+    });
+  }
+
   function setEditField(
     empId: string,
     field: "basic" | "ta" | "vpfMode" | "vpfValue",
@@ -98,6 +136,7 @@ export default function SalaryDetailsPage() {
         ta: "0",
         vpfMode: "percent",
         vpfValue: "0",
+        licAmounts: [],
       };
       return { ...prev, [empId]: { ...existing, [field]: value } };
     });
@@ -125,11 +164,15 @@ export default function SalaryDetailsPage() {
         dob: emp.dob,
         basicSalary: BigInt(basic || "0"),
       });
+      const licAmounts =
+        salaryEdits[emp.employeeId]?.licAmounts ??
+        (Array.isArray(extra.licAmounts) ? extra.licAmounts : []);
       saveEmpExtra(emp.employeeId, {
         ...extra,
         ta: Number(ta) || 0,
         vpfMode,
         vpfValue: Number(vpfValue) || 0,
+        licAmounts: licAmounts.map(Number),
       });
       toast.success(`Saved salary for ${emp.name}`);
     } catch {
@@ -154,7 +197,6 @@ export default function SalaryDetailsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <Select value={instId} onValueChange={handleInstChange}>
             <SelectTrigger
               className="bg-card/60 border-border/60 w-44"
@@ -254,6 +296,9 @@ export default function SalaryDetailsPage() {
                       </TableHead>
                       <TableHead className="text-xs font-semibold text-muted-foreground w-52">
                         VPF
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground">
+                        LIC Amounts (₹)
                       </TableHead>
                       <TableHead className="text-xs font-semibold text-muted-foreground w-20">
                         Action
@@ -382,6 +427,75 @@ export default function SalaryDetailsPage() {
                                 {vpfMode === "percent" ? "% of basic" : "fixed"}
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {/* LIC Amounts */}
+                            {(() => {
+                              const licNos: string[] = Array.isArray(
+                                extra.licNos,
+                              )
+                                ? extra.licNos
+                                : extra.licNo
+                                  ? [extra.licNo]
+                                  : [];
+                              if (
+                                licNos.length === 0 ||
+                                (licNos.length === 1 && !licNos[0])
+                              )
+                                return (
+                                  <span className="text-xs text-muted-foreground">
+                                    —
+                                  </span>
+                                );
+                              const amounts = getLicAmounts(
+                                emp.employeeId,
+                                licNos.length,
+                              );
+                              const total = amounts.reduce(
+                                (s, v) => s + (Number(v) || 0),
+                                0,
+                              );
+                              return (
+                                <div className="space-y-1 min-w-[180px]">
+                                  {licNos.map((licNo, i) => (
+                                    <div
+                                      key={licNo}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <span
+                                        className="text-[10px] text-muted-foreground font-mono w-20 truncate"
+                                        title={licNo}
+                                      >
+                                        {licNo}
+                                      </span>
+                                      <Input
+                                        type="number"
+                                        value={amounts[i] ?? "0"}
+                                        onChange={(e) =>
+                                          setLicAmount(
+                                            emp.employeeId,
+                                            i,
+                                            e.target.value,
+                                            licNos.length,
+                                          )
+                                        }
+                                        className="h-7 text-xs text-gray-900 bg-white border-border/60 w-24"
+                                        placeholder="0"
+                                        data-ocid={`salary_details.lic.input.${idx + 1}`}
+                                      />
+                                    </div>
+                                  ))}
+                                  <div className="flex items-center gap-1 pt-0.5 border-t border-border/40">
+                                    <span className="text-[10px] text-muted-foreground w-20">
+                                      Total
+                                    </span>
+                                    <span className="text-xs font-mono font-semibold text-foreground">
+                                      ₹{total.toLocaleString("en-IN")}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Button

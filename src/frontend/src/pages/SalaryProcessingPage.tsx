@@ -14,6 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -113,6 +118,13 @@ type SalaryRecord = {
   lic: number;
   profTax: number;
   incomeTax: number;
+  annualGross: number;
+  annualTaxable: number;
+  taxBeforeRebate: number;
+  itRebate: number;
+  taxAfterRebate: number;
+  itCess: number;
+  annualIT: number;
   festival: number;
   esi: number;
   security: number;
@@ -241,7 +253,7 @@ function defaultInputs(emp: LocalEmployee): SalaryInputs {
     bonus: 0,
     daArrears: 0,
     arrears: 0,
-    ta: isRegular ? empTA : 0,
+    ta: empTA,
     conveyanceAllowance: 0,
     washingAllowance: 0,
     ltc: 0,
@@ -309,11 +321,12 @@ function calcSalary(
 
   const totalLWP = lwpPrev + lwpCurr;
   const totalPeriodDays = totalPrev - 25 + 1 + 24;
-  const ta = isRegular
-    ? totalLWP === 0
+  const ta =
+    totalLWP === 0
       ? inputs.ta
-      : Math.round(inputs.ta * ((totalPeriodDays - totalLWP) / totalPeriodDays))
-    : 0;
+      : Math.round(
+          inputs.ta * ((totalPeriodDays - totalLWP) / totalPeriodDays),
+        );
 
   const specialPay = isRegular ? inputs.specialPay : 0;
   const ltc = isRegular ? inputs.ltc : 0;
@@ -335,30 +348,104 @@ function calcSalary(
     inputs.bonus +
     (isRegular ? 0 : inputs.arrears);
 
-  const epf = Math.round(adjustedBasic * 0.12);
-  const esi = grossEarnings <= 21000 ? Math.round(grossEarnings * 0.0075) : 0;
+  // EPF base: regular = basic+specialPay+DA+daArrears; temporary = basic+arrears
+  const epfBase = isRegular
+    ? adjustedBasic + (inputs.specialPay || 0) + da + daArrears
+    : adjustedBasic + (inputs.arrears || 0);
+  const epf = Math.round(epfBase * 0.12);
+  const esicBase = grossEarnings - inputs.conveyanceAllowance - inputs.bonus;
+  const esi = esicBase <= 21000 ? Math.round(esicBase * 0.0075) : 0;
 
-  const annualGross = grossEarnings * 12;
+  // Financial year position: April=0, May=1, ..., March=11
+  const calToFY = (m: number) => (m >= 4 ? m - 4 : m + 8); // monthNum is 1-based
+  const fyPosition = calToFY(monthNum); // 0=April
+  const monthsRemaining = 12 - fyPosition; // incl. current month
+
+  // Load prior months' gross from saved salary records for this FY
+  let priorGrossTotal = 0;
+  if (fyPosition > 0) {
+    const allSalaries = getSalaries();
+    for (let i = 0; i < fyPosition; i++) {
+      // FY index i -> calendar month
+      // Actually: April=4,May=5,...,Dec=12,Jan=1,Feb=2,Mar=3
+      const calMonth = i + 4 <= 12 ? i + 4 : i + 4 - 12;
+      // Prior months' year: Apr-Dec prior months are in same FY
+      // If processing Jan/Feb/Mar (yearNum), FY started Apr of yearNum-1
+      // If processing Apr-Dec (yearNum), FY started Apr of yearNum
+      const fyStartYear = monthNum >= 4 ? yearNum : yearNum - 1;
+      const calYear = calMonth >= 4 ? fyStartYear : fyStartYear + 1;
+      const saved = allSalaries.find(
+        (s) =>
+          s.employeeId === emp.id && s.month === calMonth && s.year === calYear,
+      );
+      if (saved) {
+        priorGrossTotal += saved.grossEarnings || 0;
+      } else {
+        priorGrossTotal += grossEarnings; // fallback: assume same gross
+      }
+    }
+  }
+  const annualGross = priorGrossTotal + grossEarnings * monthsRemaining;
+
   let profTax = 0;
   if (annualGross >= 400000) profTax = 208;
   else if (annualGross >= 300000) profTax = 167;
   else if (annualGross >= 225000) profTax = 125;
 
-  const annualTaxable = Math.max(0, grossEarnings * 12 - 75000);
-  let annualIT = 0;
+  const annualTaxable = Math.max(0, annualGross - 75000);
+  let taxBeforeRebate = 0;
   if (annualTaxable > 2400000)
-    annualIT = (annualTaxable - 2400000) * 0.3 + 300000;
+    taxBeforeRebate = (annualTaxable - 2400000) * 0.3 + 300000;
   else if (annualTaxable > 2000000)
-    annualIT = (annualTaxable - 2000000) * 0.25 + 200000;
+    taxBeforeRebate = (annualTaxable - 2000000) * 0.25 + 200000;
   else if (annualTaxable > 1600000)
-    annualIT = (annualTaxable - 1600000) * 0.2 + 120000;
+    taxBeforeRebate = (annualTaxable - 1600000) * 0.2 + 120000;
   else if (annualTaxable > 1200000)
-    annualIT = (annualTaxable - 1200000) * 0.15 + 60000;
+    taxBeforeRebate = (annualTaxable - 1200000) * 0.15 + 60000;
   else if (annualTaxable > 800000)
-    annualIT = (annualTaxable - 800000) * 0.1 + 20000;
-  else if (annualTaxable > 400000) annualIT = (annualTaxable - 400000) * 0.05;
-  if (annualTaxable <= 700000 && annualIT <= 25000) annualIT = 0;
-  const incomeTax = Math.round(annualIT / 12);
+    taxBeforeRebate = (annualTaxable - 800000) * 0.1 + 20000;
+  else if (annualTaxable > 400000)
+    taxBeforeRebate = (annualTaxable - 400000) * 0.05;
+  const rebate =
+    annualTaxable < 1275000
+      ? Math.max(0, taxBeforeRebate - (annualTaxable - 1200000))
+      : 0;
+  const taxAfterRebate = Math.max(0, taxBeforeRebate - rebate);
+  const cess = taxAfterRebate * 0.04;
+  const annualIT = Math.max(0, taxAfterRebate - cess);
+
+  // Prorate: compute tax already accounted in prior months then spread remainder
+  let taxAlreadyPaid = 0;
+  if (fyPosition > 0) {
+    const priorAnnualGross =
+      priorGrossTotal + grossEarnings * (12 - fyPosition + fyPosition);
+    const priorAnnualTaxable = Math.max(0, priorAnnualGross - 75000);
+    let priorTBR = 0;
+    if (priorAnnualTaxable > 2400000)
+      priorTBR = (priorAnnualTaxable - 2400000) * 0.3 + 300000;
+    else if (priorAnnualTaxable > 2000000)
+      priorTBR = (priorAnnualTaxable - 2000000) * 0.25 + 200000;
+    else if (priorAnnualTaxable > 1600000)
+      priorTBR = (priorAnnualTaxable - 1600000) * 0.2 + 120000;
+    else if (priorAnnualTaxable > 1200000)
+      priorTBR = (priorAnnualTaxable - 1200000) * 0.15 + 60000;
+    else if (priorAnnualTaxable > 800000)
+      priorTBR = (priorAnnualTaxable - 800000) * 0.1 + 20000;
+    else if (priorAnnualTaxable > 400000)
+      priorTBR = (priorAnnualTaxable - 400000) * 0.05;
+    const priorRebate =
+      priorAnnualTaxable < 1275000
+        ? Math.max(0, priorTBR - (priorAnnualTaxable - 1200000))
+        : 0;
+    const priorTAR = Math.max(0, priorTBR - priorRebate);
+    const priorCess = priorTAR * 0.04;
+    const priorAnnualIT = Math.max(0, priorTAR - priorCess);
+    taxAlreadyPaid = Math.round((priorAnnualIT * fyPosition) / 12);
+  }
+  const incomeTax = Math.max(
+    0,
+    Math.round((annualIT - taxAlreadyPaid) / monthsRemaining),
+  );
 
   const totalDeductions =
     epf +
@@ -407,6 +494,13 @@ function calcSalary(
     lic: inputs.lic,
     profTax,
     incomeTax,
+    annualGross: annualGross,
+    annualTaxable,
+    taxBeforeRebate,
+    itRebate: rebate,
+    taxAfterRebate,
+    itCess: cess,
+    annualIT,
     festival: inputs.festival,
     esi,
     security: inputs.security,
@@ -643,6 +737,26 @@ export default function SalaryProcessingPage() {
     if (!isAttendanceSaved(emp.id)) {
       toast.error("Save attendance first before processing salary.");
       return;
+    }
+    const empExtraForValidation = getEmpExtra(emp.employeeId);
+    const inputsForValidation = getInputs(emp);
+    if (empExtraForValidation.bhelQuarter === "yes") {
+      if (
+        !inputsForValidation.houseRent ||
+        inputsForValidation.houseRent === 0
+      ) {
+        toast.error("House Rent is mandatory for BHEL quarter employees.");
+        return;
+      }
+      if (
+        !inputsForValidation.electricityCharges ||
+        inputsForValidation.electricityCharges === 0
+      ) {
+        toast.error(
+          "Electricity charges are mandatory for BHEL quarter employees.",
+        );
+        return;
+      }
     }
     const inputs = getInputs(emp);
     const { lwpPrev, lwpCurr } = getLwp(emp.id);
@@ -1090,12 +1204,174 @@ export default function SalaryProcessingPage() {
                           <TrendingUp className="w-3 h-3" /> Earnings
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                          {/* Basic - from salary details (read-only) */}
-                          <NumInput
-                            label="Basic Pay"
-                            value={preview.basicSalary}
-                            readOnly
-                          />
+                          {/* Basic - from salary details (read-only) with LWP breakdown */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground">
+                                Basic Pay
+                              </Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center w-3.5 h-3.5 text-muted-foreground/60 hover:text-primary transition-colors"
+                                    data-ocid="salary.basic_breakdown.open_modal_button"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-80 p-3"
+                                  side="top"
+                                  align="start"
+                                >
+                                  <p className="text-xs font-semibold text-foreground mb-2">
+                                    Basic Pay Breakdown
+                                  </p>
+                                  <div className="space-y-1 text-[11px]">
+                                    {(() => {
+                                      const rawBasic =
+                                        Number(emp.basicSalary) || 0;
+                                      const prevMonthB =
+                                        selectedMonthNum === 1
+                                          ? 12
+                                          : selectedMonthNum - 1;
+                                      const prevYearB =
+                                        selectedMonthNum === 1
+                                          ? selectedYearNum - 1
+                                          : selectedYearNum;
+                                      const daysInPrev = getDaysInMonthUtil(
+                                        prevMonthB,
+                                        prevYearB,
+                                      );
+                                      const daysInCurr = getDaysInMonthUtil(
+                                        selectedMonthNum,
+                                        selectedYearNum,
+                                      );
+
+                                      // Parse attendance days to get LWP dates
+                                      const attDays = getAttendanceDays(emp.id);
+                                      const lwpDates: {
+                                        label: string;
+                                        leaveType: string;
+                                        isPrev: boolean;
+                                      }[] = [];
+                                      for (const item of attDays) {
+                                        const parts = item.split(":");
+                                        const key = parts[0];
+                                        const status = parts[1];
+                                        const leaveType = parts[2] || "LWP";
+                                        if (
+                                          status === "absent" &&
+                                          leaveType === "LWP"
+                                        ) {
+                                          const isPrev =
+                                            key.startsWith("prev_");
+                                          const dayNum = isPrev
+                                            ? key.replace("prev_", "")
+                                            : key;
+                                          const monthLabel = isPrev
+                                            ? MONTHS[prevMonthB - 1].slice(0, 3)
+                                            : MONTHS[
+                                                selectedMonthNum - 1
+                                              ].slice(0, 3);
+                                          lwpDates.push({
+                                            label: `${dayNum}-${monthLabel}`,
+                                            leaveType,
+                                            isPrev,
+                                          });
+                                        }
+                                      }
+                                      const lwpPrevDates = lwpDates.filter(
+                                        (d) => d.isPrev,
+                                      );
+                                      const lwpCurrDates = lwpDates.filter(
+                                        (d) => !d.isPrev,
+                                      );
+
+                                      return (
+                                        <>
+                                          <div className="flex justify-between text-muted-foreground">
+                                            <span>
+                                              Basic (from Salary Details)
+                                            </span>
+                                            <span className="font-mono">
+                                              ₹
+                                              {rawBasic.toLocaleString("en-IN")}
+                                            </span>
+                                          </div>
+                                          <div className="border-t border-border/40 pt-1 mt-1">
+                                            <p className="text-muted-foreground font-semibold mb-0.5">
+                                              LWP — Prev Month (
+                                              {MONTHS[prevMonthB - 1]},{" "}
+                                              {daysInPrev} days)
+                                            </p>
+                                            {lwpPrevDates.length === 0 ? (
+                                              <p className="text-muted-foreground/60 italic">
+                                                No LWP days
+                                              </p>
+                                            ) : (
+                                              <p className="text-red-400 font-mono">
+                                                {lwpPrev} day(s):{" "}
+                                                {lwpPrevDates
+                                                  .map((d) => d.label)
+                                                  .join(", ")}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="border-t border-border/40 pt-1 mt-1">
+                                            <p className="text-muted-foreground font-semibold mb-0.5">
+                                              LWP — Curr Month (
+                                              {MONTHS[selectedMonthNum - 1]},{" "}
+                                              {daysInCurr} days)
+                                            </p>
+                                            {lwpCurrDates.length === 0 ? (
+                                              <p className="text-muted-foreground/60 italic">
+                                                No LWP days
+                                              </p>
+                                            ) : (
+                                              <p className="text-red-400 font-mono">
+                                                {lwpCurr} day(s):{" "}
+                                                {lwpCurrDates
+                                                  .map((d) => d.label)
+                                                  .join(", ")}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="border-t border-border/40 pt-1 mt-1 text-muted-foreground/80">
+                                            <p className="font-semibold mb-0.5">
+                                              LWP Deduction Formula
+                                            </p>
+                                            <p className="font-mono text-[10px]">
+                                              round(({rawBasic}×{lwpPrev}/
+                                              {daysInPrev}) + ({rawBasic}×
+                                              {lwpCurr}/{daysInCurr})) ={" "}
+                                              {lwpDeductionAmount}
+                                            </p>
+                                          </div>
+                                          <div className="border-t border-border/50 pt-1 flex justify-between font-semibold text-foreground">
+                                            <span>Basic after LWP</span>
+                                            <span className="font-mono">
+                                              ₹
+                                              {preview.basicSalary.toLocaleString(
+                                                "en-IN",
+                                              )}
+                                            </span>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <Input
+                              type="number"
+                              value={preview.basicSalary || ""}
+                              readOnly
+                              className="h-7 text-xs opacity-70 cursor-default bg-card/30"
+                            />
+                          </div>
 
                           {/* LWP deduction display */}
                           <div className="space-y-1">
@@ -1139,11 +1415,6 @@ export default function SalaryProcessingPage() {
                                 value={preview.hra ?? 0}
                               />
                               <NumInput
-                                label="TA"
-                                value={inputs.ta}
-                                onChange={(v) => setInputField(empKey, "ta", v)}
-                              />
-                              <NumInput
                                 label="LTC"
                                 value={inputs.ltc}
                                 onChange={(v) =>
@@ -1162,13 +1433,20 @@ export default function SalaryProcessingPage() {
 
                           {/* Temporary-only: Arrears */}
                           {isTemporary && (
-                            <NumInput
-                              label="Arrears"
-                              value={inputs.arrears}
-                              onChange={(v) =>
-                                setInputField(empKey, "arrears", v)
-                              }
-                            />
+                            <>
+                              <NumInput
+                                label="Arrears"
+                                value={inputs.arrears}
+                                onChange={(v) =>
+                                  setInputField(empKey, "arrears", v)
+                                }
+                              />
+                              <NumInput
+                                label="TA"
+                                value={inputs.ta}
+                                onChange={(v) => setInputField(empKey, "ta", v)}
+                              />
+                            </>
                           )}
 
                           <NumInput
@@ -1229,20 +1507,57 @@ export default function SalaryProcessingPage() {
                           <TrendingDown className="w-3 h-3" /> Deductions
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                          <NumInput
-                            label="House Rent"
-                            value={inputs.houseRent}
-                            onChange={(v) =>
-                              setInputField(empKey, "houseRent", v)
-                            }
-                          />
-                          <NumInput
-                            label="Electricity"
-                            value={inputs.electricityCharges}
-                            onChange={(v) =>
-                              setInputField(empKey, "electricityCharges", v)
-                            }
-                          />
+                          {/* House Rent & Electricity - only for BHEL quarter employees */}
+                          {extra.bhelQuarter === "yes" && (
+                            <>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-red-400 font-semibold">
+                                  House Rent<span className="ml-0.5">*</span>
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={inputs.houseRent || ""}
+                                  onChange={(e) =>
+                                    setInputField(
+                                      empKey,
+                                      "houseRent",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className={`h-7 text-xs bg-card/30 ${inputs.houseRent === 0 ? "border-red-500/60 ring-1 ring-red-500/30" : "border-border/60"}`}
+                                  placeholder="0"
+                                />
+                                {inputs.houseRent === 0 && (
+                                  <p className="text-[10px] text-red-400">
+                                    Required for BHEL quarter
+                                  </p>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-red-400 font-semibold">
+                                  Electricity<span className="ml-0.5">*</span>
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={inputs.electricityCharges || ""}
+                                  onChange={(e) =>
+                                    setInputField(
+                                      empKey,
+                                      "electricityCharges",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className={`h-7 text-xs bg-card/30 ${inputs.electricityCharges === 0 ? "border-red-500/60 ring-1 ring-red-500/30" : "border-border/60"}`}
+                                  placeholder="0"
+                                />
+                                {inputs.electricityCharges === 0 && (
+                                  <p className="text-[10px] text-red-400">
+                                    Required for BHEL quarter
+                                  </p>
+                                )}
+                              </div>
+                            </>
+                          )}
 
                           {/* LWF: auto from config */}
                           <div className="space-y-1">
@@ -1297,11 +1612,86 @@ export default function SalaryProcessingPage() {
                             </div>
                           </div>
 
-                          <NumInput
-                            label="LIC"
-                            value={inputs.lic}
-                            onChange={(v) => setInputField(empKey, "lic", v)}
-                          />
+                          {/* LIC - shown only if employee has LIC nos */}
+                          {(() => {
+                            const licNos: string[] = Array.isArray(extra.licNos)
+                              ? extra.licNos
+                              : extra?.licNo
+                                ? [extra.licNo]
+                                : [];
+                            const validLicNos = licNos.filter((n) => n?.trim());
+                            if (validLicNos.length === 0) return null;
+                            const licAmounts: number[] = Array.isArray(
+                              extra.licAmounts,
+                            )
+                              ? extra.licAmounts.map(Number)
+                              : Array(validLicNos.length).fill(0);
+                            const totalLic = licAmounts.reduce(
+                              (s, v) => s + (v || 0),
+                              0,
+                            );
+                            return (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                  <Label className="text-[10px] text-muted-foreground">
+                                    LIC
+                                  </Label>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center w-3.5 h-3.5 text-muted-foreground/60 hover:text-primary transition-colors"
+                                        data-ocid="salary.lic_breakdown.open_modal_button"
+                                      >
+                                        <Info className="w-3.5 h-3.5" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-64 text-xs space-y-2 p-3"
+                                      side="right"
+                                    >
+                                      <p className="font-semibold text-sm mb-2">
+                                        LIC Breakdown
+                                      </p>
+                                      {validLicNos.map((licNo, i) => (
+                                        <div
+                                          key={licNo}
+                                          className="flex justify-between"
+                                        >
+                                          <span className="font-mono text-muted-foreground">
+                                            {licNo}
+                                          </span>
+                                          <span className="font-mono">
+                                            ₹
+                                            {(
+                                              licAmounts[i] || 0
+                                            ).toLocaleString("en-IN")}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      <div className="border-t border-border/40 pt-1 flex justify-between font-semibold">
+                                        <span>Total LIC</span>
+                                        <span>
+                                          ₹{totalLic.toLocaleString("en-IN")}
+                                        </span>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-flex items-center justify-center h-7 px-2 text-[10px] font-semibold rounded-l border border-border/60 bg-muted/50 text-muted-foreground whitespace-nowrap shrink-0">
+                                    LIC
+                                  </span>
+                                  <input
+                                    type="number"
+                                    value={totalLic}
+                                    readOnly
+                                    className="h-7 text-xs rounded-l-none border border-l-0 border-border/60 opacity-70 cursor-default bg-card/30 flex-1 min-w-0 px-2"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Prof Tax */}
                           <PrefixReadOnly
@@ -1310,12 +1700,99 @@ export default function SalaryProcessingPage() {
                             value={preview.profTax}
                           />
 
-                          {/* Income Tax */}
-                          <PrefixReadOnly
-                            label="Income Tax"
-                            prefix="IT"
-                            value={preview.incomeTax}
-                          />
+                          {/* Income Tax with breakdown */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground">
+                                Income Tax
+                              </Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center w-3.5 h-3.5 text-muted-foreground/60 hover:text-primary transition-colors"
+                                    data-ocid="salary.it_breakdown.open_modal_button"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-72 p-3"
+                                  side="top"
+                                  align="start"
+                                >
+                                  <p className="text-xs font-semibold text-foreground mb-2">
+                                    Income Tax Breakdown
+                                  </p>
+                                  <div className="space-y-1 text-[11px]">
+                                    {[
+                                      [
+                                        "Monthly Gross",
+                                        `₹${preview.grossEarnings.toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Annual Gross (Projected)",
+                                        `₹${(preview.annualGross ?? preview.grossEarnings * 12).toLocaleString("en-IN")}`,
+                                      ],
+                                      ["Standard Deduction", "₹75,000"],
+                                      [
+                                        "Annual Taxable Income",
+                                        `₹${(preview.annualTaxable ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Tax Before Rebate",
+                                        `₹${Math.round(preview.taxBeforeRebate ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Rebate",
+                                        `₹${Math.round(preview.itRebate ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Tax After Rebate",
+                                        `₹${Math.round(preview.taxAfterRebate ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Cess (4%)",
+                                        `₹${Math.round(preview.itCess ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                      [
+                                        "Annual IT",
+                                        `₹${Math.round(preview.annualIT ?? 0).toLocaleString("en-IN")}`,
+                                      ],
+                                    ].map(([label, val]) => (
+                                      <div
+                                        key={label}
+                                        className="flex justify-between text-muted-foreground"
+                                      >
+                                        <span>{label}</span>
+                                        <span className="font-mono">{val}</span>
+                                      </div>
+                                    ))}
+                                    <div className="border-t border-border/50 pt-1 flex justify-between font-semibold text-foreground">
+                                      <span>Monthly IT</span>
+                                      <span className="font-mono">
+                                        ₹
+                                        {preview.incomeTax.toLocaleString(
+                                          "en-IN",
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="flex items-center gap-0">
+                              <div className="h-7 px-2 flex items-center rounded-l border border-r-0 border-border/60 bg-muted/50 text-[10px] text-muted-foreground font-mono whitespace-nowrap">
+                                IT
+                              </div>
+                              <Input
+                                type="number"
+                                value={preview.incomeTax || ""}
+                                readOnly
+                                className="h-7 text-xs rounded-l-none opacity-70 cursor-default bg-card/30 flex-1 min-w-0"
+                              />
+                            </div>
+                          </div>
 
                           <NumInput
                             label="Festival"

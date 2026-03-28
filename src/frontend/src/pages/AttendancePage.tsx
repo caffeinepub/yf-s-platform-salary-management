@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   useDeleteAttendance,
+  useGetAllEmployees,
   useGetAllInstitutes,
   useGetAttendance,
   useGetEmployeesForInstitute,
@@ -191,7 +192,7 @@ function getDayLabel(data: DayData): string {
 
 export default function AttendancePage() {
   const now = new Date();
-  const [instituteId, setInstituteId] = useState<bigint | null>(null);
+  const [instituteId, setInstituteId] = useState<string>("all");
   const [employeeSelection, setEmployeeSelection] = useState<bigint | "all">(
     "all",
   );
@@ -202,7 +203,12 @@ export default function AttendancePage() {
   const [dialogDay, setDialogDay] = useState<string | null>(null);
 
   const { data: institutes = [] } = useGetAllInstitutes();
-  const { data: employees = [] } = useGetEmployeesForInstitute(instituteId);
+  const { data: allEmployeesData = [] } = useGetAllEmployees();
+  const { data: instEmployeesData = [] } = useGetEmployeesForInstitute(
+    instituteId !== "all" ? BigInt(instituteId) : null,
+  );
+  const employees =
+    instituteId === "all" ? allEmployeesData : instEmployeesData;
 
   const specificEmployeeId =
     employeeSelection !== "all" ? employeeSelection : null;
@@ -305,7 +311,7 @@ export default function AttendancePage() {
   };
 
   const showCalendar = specificEmployeeId !== null;
-  const showEmployeeList = instituteId !== null && employeeSelection === "all";
+  const showEmployeeList = employeeSelection === "all";
 
   const summaryStats = [
     {
@@ -387,9 +393,9 @@ export default function AttendancePage() {
         className="gradient-card rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
       >
         <Select
-          value={instituteId?.toString() ?? ""}
+          value={instituteId}
           onValueChange={(v) => {
-            setInstituteId(BigInt(v));
+            setInstituteId(v);
             setEmployeeSelection("all");
           }}
         >
@@ -397,6 +403,7 @@ export default function AttendancePage() {
             <SelectValue placeholder="Select Institute" />
           </SelectTrigger>
           <SelectContent className="max-h-[250px] overflow-y-auto">
+            <SelectItem value="all">All Institutes</SelectItem>
             {institutes.map((inst) => (
               <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
                 {inst.name}
@@ -413,7 +420,6 @@ export default function AttendancePage() {
             if (v === "all") setEmployeeSelection("all");
             else setEmployeeSelection(BigInt(v));
           }}
-          disabled={!instituteId}
         >
           <SelectTrigger data-ocid="attendance.select">
             <SelectValue placeholder="All Employees" />
@@ -650,18 +656,6 @@ export default function AttendancePage() {
             )}
           </motion.div>
         </>
-      )}
-
-      {!instituteId && (
-        <div
-          className="gradient-card rounded-xl p-12 text-center"
-          data-ocid="attendance.empty_state"
-        >
-          <CalendarCheck className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">
-            Select an institute to view employees
-          </p>
-        </div>
       )}
 
       {showEmployeeList && (

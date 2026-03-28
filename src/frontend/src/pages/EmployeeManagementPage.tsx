@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertTriangle,
   ArrowRightLeft,
   Briefcase,
   Building2,
@@ -73,6 +74,7 @@ import {
   type Institute,
   useAddEmployee,
   useDeleteEmployee,
+  useGetAllEmployees,
   useGetAllInstitutes,
   useGetEmployeesForInstitute,
   useUpdateEmployee,
@@ -443,7 +445,7 @@ interface EmpForm {
   esiNumber: string;
   aadhaarNo: string;
   uanNo: string;
-  licNo: string;
+  licNos: string[];
 }
 
 const EMPTY_FORM: EmpForm = {
@@ -475,7 +477,7 @@ const EMPTY_FORM: EmpForm = {
   esiNumber: "",
   aadhaarNo: "",
   uanNo: "",
-  licNo: "",
+  licNos: [],
 };
 
 function getEmpExtra(employeeId: string): any {
@@ -492,11 +494,13 @@ function saveEmpExtra(employeeId: string, data: any) {
 export default function EmployeeManagementPage() {
   const { data: institutes = [], isLoading: loadingInstitutes } =
     useGetAllInstitutes();
-  const [selectedInstId, setSelectedInstId] = useState<bigint | null>(
-    institutes.length > 0 ? institutes[0].id : null,
-  );
-  const { data: employees = [], isLoading: loadingEmps } =
-    useGetEmployeesForInstitute(selectedInstId ?? institutes[0]?.id ?? null);
+  const [selectedInstId, setSelectedInstId] = useState<string>("all");
+  const { data: allEmployees = [], isLoading: loadingEmps } =
+    useGetAllEmployees();
+  const employees =
+    selectedInstId === "all"
+      ? allEmployees
+      : allEmployees.filter((e) => e.instituteId.toString() === selectedInstId);
 
   const addMutation = useAddEmployee();
   const updateMutation = useUpdateEmployee();
@@ -579,8 +583,6 @@ export default function EmployeeManagementPage() {
 
   const [form, setForm] = useState<EmpForm>(EMPTY_FORM);
 
-  const effectiveInstId = selectedInstId ?? institutes[0]?.id ?? null;
-
   const filtered = employees.filter(
     (e) =>
       e.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -624,7 +626,11 @@ export default function EmployeeManagementPage() {
       esiNumber: extra.esiNumber || extra.esicNumber || "",
       aadhaarNo: extra.aadhaarNo || extra.aadharNumber || "",
       uanNo: extra.uanNo || "",
-      licNo: extra.licNo || "",
+      licNos: Array.isArray(extra.licNos)
+        ? extra.licNos
+        : extra.licNo
+          ? [extra.licNo]
+          : [""],
       ta: String(extra.ta || "0"),
     });
     setFormOpen(true);
@@ -839,7 +845,7 @@ export default function EmployeeManagementPage() {
         esiNumber: form.esiNumber,
         aadhaarNo: form.aadhaarNo,
         uanNo: form.uanNo,
-        licNo: form.licNo,
+        licNos: form.licNos,
         ta: Number(form.ta) || 0,
         designation: form.designation,
         institute:
@@ -915,6 +921,27 @@ export default function EmployeeManagementPage() {
 
   return (
     <div className="space-y-6" data-ocid="employees.page">
+      {/* No institutes warning */}
+      {!loadingInstitutes && institutes.length === 0 && (
+        <div
+          className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+          data-ocid="employees.empty_state"
+        >
+          <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-300">
+              No Institute Found
+            </p>
+            <p className="text-xs text-amber-400/80 mt-0.5">
+              Please go to{" "}
+              <span className="font-medium text-amber-300">
+                Institute Management
+              </span>{" "}
+              and add an institute before adding employees.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -956,7 +983,8 @@ export default function EmployeeManagementPage() {
           </Button>
           <Button
             onClick={openAdd}
-            className="gradient-primary text-white border-0 glow-primary gap-2"
+            disabled={institutes.length === 0 && !loadingInstitutes}
+            className="gradient-primary text-white border-0 glow-primary gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             data-ocid="employees.add_button"
           >
             <Plus className="w-4 h-4" /> Add Employee
@@ -991,10 +1019,9 @@ export default function EmployeeManagementPage() {
           )}
         </div>
         <div className="flex items-center gap-2 w-full sm:w-60">
-          <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           <Select
-            value={effectiveInstId?.toString() ?? ""}
-            onValueChange={(v) => setSelectedInstId(BigInt(v))}
+            value={selectedInstId}
+            onValueChange={(v) => setSelectedInstId(v)}
           >
             <SelectTrigger
               className="bg-card/60 border-border/60"
@@ -1003,6 +1030,7 @@ export default function EmployeeManagementPage() {
               <SelectValue placeholder="Select Institute" />
             </SelectTrigger>
             <SelectContent className="max-h-72 overflow-y-auto">
+              <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((i: Institute) => (
                 <SelectItem key={i.id.toString()} value={i.id.toString()}>
                   {i.name}
@@ -1651,15 +1679,66 @@ export default function EmployeeManagementPage() {
                       data-ocid="employees.uan.input"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">LIC No</Label>
-                    <Input
-                      value={form.licNo}
-                      onChange={(e) => setField("licNo", e.target.value)}
-                      placeholder="e.g., 123456789"
-                      className={inputCls}
-                      data-ocid="employees.lic.input"
-                    />
+                  <div className="space-y-1.5 col-span-2">
+                    <Label className="text-xs">LIC No(s)</Label>
+                    <div className="space-y-2">
+                      {form.licNos.map((licNo, idx) => (
+                        <div
+                          // biome-ignore lint/suspicious/noArrayIndexKey: LIC entries may be empty
+                          key={`lic-${idx}`}
+                          className="flex items-center gap-2"
+                        >
+                          {editTarget ? (
+                            // In edit mode: show as read-only badge with delete
+                            <div className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-md bg-muted/40 border border-border/50">
+                              <span className="text-sm font-mono text-foreground">
+                                {licNo || (
+                                  <span className="text-muted-foreground italic">
+                                    —
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          ) : (
+                            <Input
+                              value={licNo}
+                              onChange={(e) => {
+                                const updated = [...form.licNos];
+                                updated[idx] = e.target.value;
+                                setField("licNos", updated as any);
+                              }}
+                              placeholder="e.g., 123456789"
+                              className={inputCls}
+                              data-ocid={`employees.lic.input.${idx + 1}`}
+                            />
+                          )}
+                          {form.licNos.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = form.licNos.filter(
+                                  (_, i) => i !== idx,
+                                );
+                                setField("licNos", updated as any);
+                              }}
+                              className="shrink-0 text-destructive hover:text-destructive/80 transition-colors"
+                              title="Remove this LIC No"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setField("licNos", [...form.licNos, ""] as any)
+                        }
+                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                      >
+                        + Add another LIC No.
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
