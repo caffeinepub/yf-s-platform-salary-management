@@ -64,7 +64,7 @@ const SESSION_YEAR_LIST = (() => {
   const currentM = now.getMonth();
   const latestStartYear = currentM >= 3 ? currentY : currentY - 1;
   const result: string[] = [];
-  for (let y = latestStartYear; y >= 2001; y--) {
+  for (let y = latestStartYear; y >= 2004; y--) {
     result.push(`${y}-${(y + 1).toString().slice(2)}`);
   }
   return result;
@@ -378,21 +378,21 @@ const REPORT_CATEGORIES = [
 
 function getEmployees(): StoredEmployee[] {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
 }
 function getSalaries(): StoredSalary[] {
   try {
-    return JSON.parse(localStorage.getItem("salaries") || "[]");
+    return JSON.parse(localStorage.getItem("sms_salary") || "[]");
   } catch {
     return [];
   }
 }
 function getInstitutes(): string[] {
   try {
-    const inst = JSON.parse(localStorage.getItem("institutes") || "[]");
+    const inst = JSON.parse(localStorage.getItem("sms_institutes") || "[]");
     return inst.map((i: { name: string }) => i.name);
   } catch {
     return [];
@@ -1183,7 +1183,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
 
     const allInstData: { name: string; shortCode: string }[] = (() => {
       try {
-        const raw = JSON.parse(localStorage.getItem("institutes") || "[]");
+        const raw = JSON.parse(localStorage.getItem("sms_institutes") || "[]");
         return raw;
       } catch {
         return [];

@@ -1373,25 +1373,6 @@ export default function SalaryProcessingPage() {
                             />
                           </div>
 
-                          {/* LWP deduction display */}
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">
-                              LWP Deduction
-                              {(lwpPrev > 0 || lwpCurr > 0) && (
-                                <span className="ml-1 opacity-70">
-                                  ({lwpPrev}p+{lwpCurr}c days)
-                                </span>
-                              )}
-                            </Label>
-                            <div className="h-7 px-2 flex items-center rounded border border-red-500/40 bg-card/30">
-                              <span className="text-xs font-bold text-red-500">
-                                {lwpDeductionAmount > 0
-                                  ? `-${fmt(lwpDeductionAmount)}`
-                                  : "₹0"}
-                              </span>
-                            </div>
-                          </div>
-
                           {/* Regular-only fields */}
                           {!isTemporary && (
                             <>

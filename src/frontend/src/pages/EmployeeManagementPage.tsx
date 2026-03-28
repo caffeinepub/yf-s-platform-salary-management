@@ -1688,30 +1688,17 @@ export default function EmployeeManagementPage() {
                           key={`lic-${idx}`}
                           className="flex items-center gap-2"
                         >
-                          {editTarget ? (
-                            // In edit mode: show as read-only badge with delete
-                            <div className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-md bg-muted/40 border border-border/50">
-                              <span className="text-sm font-mono text-foreground">
-                                {licNo || (
-                                  <span className="text-muted-foreground italic">
-                                    —
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          ) : (
-                            <Input
-                              value={licNo}
-                              onChange={(e) => {
-                                const updated = [...form.licNos];
-                                updated[idx] = e.target.value;
-                                setField("licNos", updated as any);
-                              }}
-                              placeholder="e.g., 123456789"
-                              className={inputCls}
-                              data-ocid={`employees.lic.input.${idx + 1}`}
-                            />
-                          )}
+                          <Input
+                            value={licNo}
+                            onChange={(e) => {
+                              const updated = [...form.licNos];
+                              updated[idx] = e.target.value;
+                              setField("licNos", updated as any);
+                            }}
+                            placeholder="e.g., 123456789"
+                            className={inputCls}
+                            data-ocid={`employees.lic.input.${idx + 1}`}
+                          />
                           {form.licNos.length > 1 && (
                             <button
                               type="button"
