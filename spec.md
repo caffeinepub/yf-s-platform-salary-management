@@ -1,39 +1,38 @@
 # Yf's Platform - Salary Management
 
 ## Current State
-SalaryDetailsPage has Basic and TA fields per employee stored in empExtra/backend.
-SalaryProcessingPage has manual lwpPrev/lwpCurr/totalLWP inputs, shows DA%+DA amount as separate inputs, same for HRA%, and VPF is a plain manual amount input. All employee types see same earnings fields. LWF is manual. VPF is not in salary details.
+Multi-module platform (Salary, Tally, Fees) with persistent ICP backend. Layout has sidebar with logo box + platform name. Pages have various header styles. AttendancePage and PayslipPage have selectors in a separate card below the header. DailyWorkersPage has institute+session selectors in header row but attendance modal has period+rate inputs. ReportsPage has selectors in header (session comes BEFORE month). Payroll reports order: Paybill, Salary Register, Bank Statement. EmployeeManagementPage upload excel button has no institute lock. MenuBar shows active page label.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Salary Details: VPF field with mode toggle — `%` (percent of basic) or fixed amount. Store `vpfMode` ('percent'|'fixed') and `vpfValue` in empExtra.
-- Salary Processing: LWP Amount display — auto-calculated from attendance, shown in red with negative sign. Replace prev/curr/total LWP day inputs.
-- Salary Processing: Arrears input for temporary employees (shown instead of DA Arrears).
-- Salary Processing: LWF auto-deducted ₹10 in June and December only (no manual input, just auto-filled).
+- Logo image in the box at top-left of sidebar (already has a box `w-9 h-9 rounded-lg` with img src — user wants to confirm it shows the logo; check if image path is correct or needs fixing)
+- DailyWorkersPage: worker selector after institute selector (default "All Workers"); period selector (default current period, descending order)
+- DailyWorkersPage: rate display (read-only) shown on worker card or attendance summary; rate editable in Settings
+- DailyWorkersPage: attendance report button (bottom-right), then print button, download PDF/Excel options
+- Reports > Bank Statement: bank selector and branch selector
+- Settings: daily worker rate field (editable)
 
 ### Modify
-- Salary Details table: add VPF column with mode toggle (% / fixed) and value input.
-- Salary Processing: Basic auto-populated from salary details (already stored in emp.basicSalary + empExtra).
-- Salary Processing: Remove lwpPrev, lwpCurr, totalLWP editable inputs. Instead show single read-only "LWP Deduction" amount in red with negative sign (auto-calculated from attendance).
-- Salary Processing earnings: Special Pay, DA, HRA, TA, LTC, DA Arrears — hide for temporary employees.
-- Salary Processing: DA, HRA, EPF, ESIC, VPF — use inline locked-% prefix box + auto-calculated read-only amount (like phone country code pattern). User cannot edit % inline; % comes from fixed rates (DA=257%, HRA=20%, EPF=12%, ESIC=0.75%) or from empExtra for VPF.
-- Salary Processing: VPF calculated automatically from empExtra vpfMode/vpfValue.
-- Salary Processing: EPF, ESIC, Professional Tax, Income Tax — already auto-calc, keep as read-only with inline % prefix.
-- Salary Processing: LWF — auto-set to 10 if current month is June or December, else 0 (no manual input).
+- **Layout topbar**: Remove `activePageLabel` h2 text that shows current page name in the menu bar (point 2)
+- **Page headers consistency** (point 3): All pages should match Attendance/Payslip header style: large icon in gradient box, big title with `text-gradient`, subtitle below. Fix: DashboardPage, EmployeeManagementPage, InstituteManagementPage, SalaryDetailsPage, SalaryProcessingPage, ReportsPage, SettingsPage, DailyWorkersPage
+- **EmployeeManagementPage**: Upload Excel button should be disabled/locked if no institutes exist (like Add Employee button)
+- **AttendancePage**: Move selectors (institute, employee, month, session) from separate card into same row as the page header (like SalaryProcessingPage pattern)
+- **PayslipPage**: Move selectors (institute, employee, month, session) from separate card into same row as the page header
+- **DailyWorkersPage attendance modal**: Remove period selector and rate input from the modal attendance grid. Instead, add worker selector + period selector to the main page header row (after institute selector). Rate shown as read-only display.
+- **ReportsPage**: Change selector order — month selector BEFORE session selector
+- **ReportsPage payroll reports order**: 1st Salary Register, 2nd Pay Bill (Paybill), 3rd Bank Statement
 
 ### Remove
-- Salary Processing: Manual LWP Prev Month, LWP Curr Month, Total LWP Days inputs.
-- Salary Processing: Separate DA% and HRA% editable inputs (% is now shown as locked prefix).
-- Salary Processing: Manual LWF input (now automatic).
+- `activePageLabel` h2 from topbar in Layout.tsx
+- Period and rate input from DailyWorkers attendance modal
 
 ## Implementation Plan
-1. Update `SalaryDetailsPage.tsx`:
-   - Add VPF column: mode toggle button (%/fixed) + value input per employee.
-   - Save vpfMode and vpfValue to empExtra on Save.
-2. Update `SalaryProcessingPage.tsx`:
-   - SalaryInputs type: remove lwpPrev/lwpCurr/lwp manual fields, add lwpAmount (computed). Add arrears for temp. Remove lwf as manual (auto). Remove daPercent/hraPercent as editable.
-   - calcSalary: read vpfMode/vpfValue from empExtra to calculate vpf. Auto-calculate lwf=10 for June/December. Hide special pay/da/hra/ta/ltc/daArrears for temporary; show arrears for temporary instead.
-   - NumInput component: add PercentPrefixInput variant for inline locked-% prefix + auto-calculated amount.
-   - In expanded form: show LWP Deduction as red negative display (not input). Show DA as [257%][calc], HRA as [20%][calc], EPF as [12%][calc], ESIC as [0.75%][calc], VPF as [vpf%][calc] or fixed.
-   - LWF: no input shown; auto-set and displayed as auto-deducted note in June/Dec.
+1. **Layout.tsx**: Remove the `<h2>{activePageLabel}</h2>` from the topbar header.
+2. **Page headers**: Update DashboardPage, EmployeeManagementPage, InstituteManagementPage, SalaryDetailsPage, SalaryProcessingPage, ReportsPage, SettingsPage, DailyWorkersPage to use consistent header: `w-10 h-10 rounded-xl gradient-primary glow-primary` icon box + `text-2xl font-display font-bold text-gradient` title + subtitle in muted text.
+3. **EmployeeManagementPage**: Disable Upload Excel button when `institutes.length === 0`.
+4. **AttendancePage**: Merge selectors row into header row (flex-wrap layout with title on left, selectors on right — same as SalaryProcessingPage).
+5. **PayslipPage**: Same — merge selectors into header row.
+6. **DailyWorkersPage**: Add worker selector (default "all") and period selector (descending, default current period) to main header row after institute selector. Remove period and rate inputs from attendance modal. Show rate as read-only badge in attendance modal summary. Add attendance report/print/download buttons at bottom-right of attendance modal.
+7. **ReportsPage**: Swap month and session selector order. Reorder payroll reports array: Salary Register first, Paybill second, Bank Statement third. Add bank/branch selectors for Bank Statement report.
+8. **SettingsPage**: Add Daily Worker Rate setting section.

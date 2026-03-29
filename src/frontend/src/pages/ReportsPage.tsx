@@ -231,16 +231,16 @@ const REPORT_CATEGORIES = [
     icon: <BadgeIndianRupee className="w-4 h-4" />,
     reports: [
       {
-        id: "paybill",
-        label: "Paybill / Pay Register",
-        icon: <FileText className="w-4 h-4" />,
-        desc: "Monthly salary summary for all employees",
-      },
-      {
         id: "salary-register",
         label: "Salary Register",
         icon: <ClipboardList className="w-4 h-4" />,
         desc: "Annual per-employee salary register with all components",
+      },
+      {
+        id: "paybill",
+        label: "Paybill / Pay Register",
+        icon: <FileText className="w-4 h-4" />,
+        desc: "Monthly salary summary for all employees",
       },
       {
         id: "bank-statement",
@@ -490,6 +490,8 @@ export default function ReportsPage() {
     getCurrentSessionYear(),
   );
   const [activeCategory, setActiveCategory] = useState("payroll");
+  const [selectedBank, setSelectedBank] = useState("all");
+  const [selectedBranch, setSelectedBranch] = useState("all");
   // Derive calendar year from session and selected month
   const selectedMonthNum = MONTHS.indexOf(selectedMonth) + 1;
   const selectedYear = (() => {
@@ -1796,11 +1798,13 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
             <FileBarChart2 className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-display font-bold">Reports Center</h1>
+            <h1 className="text-2xl font-display font-bold text-gradient">
+              Reports Center
+            </h1>
             <p className="text-sm text-muted-foreground">
               Generate &amp; download statutory and payroll reports
             </p>
@@ -1824,6 +1828,19 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
               ))}
             </SelectContent>
           </Select>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-32 h-9">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {getSessionMonthNames().map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select
             value={selectedSessionYear}
             onValueChange={setSelectedSessionYear}
@@ -1835,19 +1852,6 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
               {SESSION_YEAR_LIST.map((y) => (
                 <SelectItem key={y} value={y}>
                   {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-32 h-9">
-              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="max-h-[250px] overflow-y-auto">
-              {getSessionMonthNames().map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1934,6 +1938,54 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                     </p>
                   </CardHeader>
                   <CardContent className="pt-0">
+                    {rep.id === "bank-statement" && (
+                      <div className="flex gap-2 mb-2">
+                        <Select
+                          value={selectedBank}
+                          onValueChange={setSelectedBank}
+                        >
+                          <SelectTrigger className="h-7 text-xs flex-1">
+                            <SelectValue placeholder="Bank" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px] overflow-y-auto">
+                            <SelectItem value="all">All Banks</SelectItem>
+                            {[
+                              ...new Set(
+                                employees
+                                  .map((e) => e.bankName)
+                                  .filter(Boolean),
+                              ),
+                            ].map((b) => (
+                              <SelectItem key={b as string} value={b as string}>
+                                {b as string}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={selectedBranch}
+                          onValueChange={setSelectedBranch}
+                        >
+                          <SelectTrigger className="h-7 text-xs flex-1">
+                            <SelectValue placeholder="Branch" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px] overflow-y-auto">
+                            <SelectItem value="all">All Branches</SelectItem>
+                            {[
+                              ...new Set(
+                                employees
+                                  .map((e) => (e as any).bankBranch)
+                                  .filter(Boolean),
+                              ),
+                            ].map((b) => (
+                              <SelectItem key={b as string} value={b as string}>
+                                {b as string}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">
                         {filteredEmployees.length} employees

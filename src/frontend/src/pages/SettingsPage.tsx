@@ -33,6 +33,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  HardHat,
   Info,
   Key,
   Pencil,
@@ -1065,6 +1066,94 @@ function SystemInfoSection() {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+
+function DailyWorkerRateSection() {
+  const [rate, setRate] = useState(() =>
+    Number(localStorage.getItem("dailyWorkerRate") || "500"),
+  );
+  const [editing, setEditing] = useState(false);
+  const [tempRate, setTempRate] = useState(String(rate));
+
+  function handleSave() {
+    const v = Number(tempRate);
+    if (Number.isNaN(v) || v < 0) {
+      toast.error("Invalid rate");
+      return;
+    }
+    localStorage.setItem("dailyWorkerRate", String(v));
+    setRate(v);
+    setEditing(false);
+    toast.success("Daily worker rate updated.");
+  }
+
+  return (
+    <Card className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent">
+              <HardHat className="w-5 h-5" />
+            </div>
+            <CardTitle className="text-sm font-display">
+              Daily Worker Rate
+            </CardTitle>
+          </div>
+          <Badge
+            variant="secondary"
+            className="text-xs bg-blue-500/20 text-blue-400"
+          >
+            ₹{rate}/day
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <CardDescription className="text-xs mb-3">
+          Rate per day for daily rated workers. Used in attendance calculation.
+        </CardDescription>
+        {editing ? (
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min={0}
+              value={tempRate}
+              onChange={(e) => setTempRate(e.target.value)}
+              className="h-8 text-sm"
+              placeholder="Rate per day"
+            />
+            <Button
+              size="sm"
+              className="gradient-primary h-8 text-xs"
+              onClick={handleSave}
+            >
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                setEditing(false);
+                setTempRate(String(rate));
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs gap-1"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="w-3 h-3" /> Edit Rate
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6" data-ocid="settings.page">
@@ -1074,15 +1163,19 @@ export default function SettingsPage() {
         animate={{ opacity: 1, x: 0 }}
         className="flex items-center justify-between"
       >
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gradient">
-            Settings
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            System configuration and preferences
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+            <Settings className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold text-gradient">
+              Settings
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              System configuration and preferences
+            </p>
+          </div>
         </div>
-        <Settings className="w-6 h-6 text-muted-foreground/50" />
       </motion.div>
 
       {/* Sections grid */}
@@ -1095,6 +1188,7 @@ export default function SettingsPage() {
         <UserPasswordSection />
         <SalaryConfigSection />
         <LWFConfigSection />
+        <DailyWorkerRateSection />
         <BackupRestoreSection />
         <TaxSlabsSection />
         <SystemInfoSection />

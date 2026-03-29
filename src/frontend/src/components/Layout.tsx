@@ -524,17 +524,6 @@ export default function Layout({
     </div>
   );
 
-  const activePageLabel =
-    appSystem === "salary"
-      ? (NAV_ITEMS.find((i) => i.id === currentPage)?.label ?? "Dashboard")
-      : appSystem === "tally"
-        ? (TALLY_NAV_GROUPS.flatMap((g) => g.items).find(
-            (i) => i.id === tallyPage,
-          )?.label ?? "Dashboard")
-        : (FEES_NAV_GROUPS.flatMap((g) => g.items).find(
-            (i) => i.id === feesPage,
-          )?.label ?? "Dashboard");
-
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop Sidebar */}
@@ -644,10 +633,6 @@ export default function Layout({
                 <span className="hidden sm:inline">Fees Manager</span>
               </button>
             </div>
-
-            <h2 className="font-display font-semibold text-foreground/90 capitalize hidden md:block">
-              {activePageLabel}
-            </h2>
           </div>
           <div className="flex items-center gap-2">
             <button

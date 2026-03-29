@@ -33,11 +33,13 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  Download,
   HardHat,
   Lock,
   LogOut,
   Pencil,
   Plus,
+  Printer,
   Save,
   Trash2,
   Unlock,
@@ -199,6 +201,11 @@ export default function DailyWorkersPage() {
   const [workers, setWorkers] = useState<DailyWorker[]>(getWorkers);
   const [periods, setPeriods] = useState<WorkerPeriod[]>(getPeriods);
   const [filterInstitute, setFilterInstitute] = useState("all");
+  const [filterWorker, setFilterWorker] = useState("all");
+  const [filterPeriod, setFilterPeriod] = useState("");
+  const [dailyWorkerRate] = useState(() =>
+    Number(localStorage.getItem("dailyWorkerRate") || "500"),
+  );
   const [selectedSession, setSelectedSession] = useState(getCurrentSession());
   const sessionList = getSessionList();
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -212,7 +219,6 @@ export default function DailyWorkersPage() {
     null,
   );
   const [selectedPeriod, setSelectedPeriod] = useState("");
-  const [ratePerDay, setRatePerDay] = useState("");
   const [attendanceMap, setAttendanceMap] = useState<Record<string, boolean>>(
     {},
   );
@@ -227,6 +233,12 @@ export default function DailyWorkersPage() {
     Number.parseInt(selectedSession.split("-")[0], 10),
   );
   const yearPeriods = generatePeriods(Number(selectedYear));
+  const yearPeriodsDesc = [...yearPeriods].reverse();
+
+  // Set default filterPeriod to most recent on first render
+  if (!filterPeriod && yearPeriodsDesc.length > 0) {
+    setTimeout(() => setFilterPeriod(yearPeriodsDesc[0].label), 0);
+  }
 
   const filteredWorkers = workers.filter(
     (w) => filterInstitute === "all" || w.institute === filterInstitute,
@@ -300,9 +312,16 @@ export default function DailyWorkersPage() {
 
   function openAttendance(worker: DailyWorker) {
     setAttendanceWorker(worker);
+    // Use filterPeriod from header, fallback to most recent
+    const initPeriod =
+      filterPeriod && filterPeriod !== "all"
+        ? filterPeriod
+        : yearPeriodsDesc[0]?.label || "";
     setSelectedPeriod("");
-    setRatePerDay("");
     setAttendanceMap({});
+    if (initPeriod) {
+      setTimeout(() => handlePeriodSelect(initPeriod), 0);
+    }
   }
 
   function handlePeriodSelect(periodLabel: string) {
@@ -316,7 +335,6 @@ export default function DailyWorkersPage() {
     );
     if (saved) {
       setAttendanceMap(saved.attendance);
-      setRatePerDay(String(saved.ratePerDay));
     } else {
       // Default: weekdays present (true), Sundays absent (false)
       const defaultMap: Record<string, boolean> = {};
@@ -347,12 +365,12 @@ export default function DailyWorkersPage() {
   }
 
   function getNetPayable() {
-    return getPresentDays() * (Number(ratePerDay) || 0);
+    return getPresentDays() * dailyWorkerRate;
   }
 
   function handleSavePeriod() {
-    if (!attendanceWorker || !selectedPeriod || !ratePerDay) {
-      toast.error("Select period and enter rate.");
+    if (!attendanceWorker || !selectedPeriod) {
+      toast.error("Select a period first.");
       return;
     }
     const pDef = yearPeriods.find((p) => p.label === selectedPeriod)!;
@@ -372,7 +390,7 @@ export default function DailyWorkersPage() {
       periodLabel: selectedPeriod,
       startDate: pDef.start,
       endDate: pDef.end,
-      ratePerDay: Number(ratePerDay),
+      ratePerDay: dailyWorkerRate,
       attendance: { ...attendanceMap },
       presentDays,
       netPayable,
@@ -426,15 +444,15 @@ export default function DailyWorkersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
             <HardHat className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-display font-bold">
+            <h1 className="text-2xl font-display font-bold text-gradient">
               Daily Rated Workers
             </h1>
             <p className="text-sm text-muted-foreground">
-              Manage daily wage workers by institute & period
+              Manage daily wage workers by institute &amp; period
             </p>
           </div>
         </div>
@@ -449,6 +467,40 @@ export default function DailyWorkersPage() {
               {institutes.map((i) => (
                 <SelectItem key={i} value={i}>
                   {i}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterWorker} onValueChange={setFilterWorker}>
+            <SelectTrigger className="w-40 h-9">
+              <HardHat className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="All Workers" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Workers</SelectItem>
+              {workers
+                .filter(
+                  (w) =>
+                    filterInstitute === "all" ||
+                    w.institute === filterInstitute,
+                )
+                .map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+            <SelectTrigger className="w-44 h-9">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Period" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Periods</SelectItem>
+              {yearPeriodsDesc.map((p) => (
+                <SelectItem key={p.label} value={p.label}>
+                  {p.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -739,47 +791,17 @@ export default function DailyWorkersPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Period + Rate selectors */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Period (15-day)</Label>
-                <Select
-                  value={selectedPeriod}
-                  onValueChange={handlePeriodSelect}
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[250px] overflow-y-auto">
-                    {yearPeriods.map((p) => {
-                      const saved =
-                        attendanceWorker &&
-                        periods.find(
-                          (pr) =>
-                            pr.workerId === attendanceWorker.id &&
-                            pr.periodLabel === p.label,
-                        );
-                      return (
-                        <SelectItem key={p.label} value={p.label}>
-                          {p.label} {saved?.locked ? "🔒" : ""}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+            {/* Period display */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">
+                  {selectedPeriod || "No period selected"}
+                </span>
               </div>
-              <div>
-                <Label>Rate per Day (₹)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 500"
-                  value={ratePerDay}
-                  onChange={(e) => setRatePerDay(e.target.value)}
-                  disabled={currentPeriodRecord?.locked}
-                  className="mt-1"
-                />
-              </div>
+              <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                Rate: <strong>₹{dailyWorkerRate}/day</strong>
+              </span>
             </div>
 
             {/* Attendance grid */}
@@ -887,6 +909,41 @@ export default function DailyWorkersPage() {
                       <Save className="w-3.5 h-3.5" /> Save & Lock
                     </Button>
                   )}
+                </div>
+                <div className="flex justify-end gap-2 mt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => {
+                      const worker = attendanceWorker;
+                      if (!worker || !selectedPeriod) return;
+                      const nl = "\n";
+                      const rows = datesInPeriod
+                        .map(
+                          (d) =>
+                            `${d},${attendanceMap[d] ? "Present" : "Absent"}`,
+                        )
+                        .join(nl);
+                      const csv = `Date,Status${nl}${rows}${nl}${nl}Present Days,${getPresentDays()}${nl}Rate,${dailyWorkerRate}${nl}Net Payable,${getNetPayable()}`;
+                      const blob = new Blob([csv], { type: "text/csv" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${worker.name}-${selectedPeriod}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    <Download className="w-3 h-3" /> Excel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs gap-1 gradient-primary"
+                    onClick={() => window.print()}
+                  >
+                    <Printer className="w-3 h-3" /> Print / PDF
+                  </Button>
                 </div>
               </>
             )}

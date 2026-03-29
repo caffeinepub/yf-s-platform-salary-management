@@ -188,13 +188,18 @@ export default function SalaryDetailsPage() {
         animate={{ opacity: 1, x: 0 }}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gradient">
-            Salary Details
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Set Basic Salary, TA and VPF for each employee
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+            <IndianRupee className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold text-gradient">
+              Salary Details
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Set Basic Salary, TA and VPF for each employee
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Select value={instId} onValueChange={handleInstChange}>

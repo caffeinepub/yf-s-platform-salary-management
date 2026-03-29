@@ -975,8 +975,9 @@ export default function EmployeeManagementPage() {
           </Button>
           <Button
             variant="outline"
-            className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+            className="gap-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => xlsxFileRef.current?.click()}
+            disabled={institutes.length === 0 && !loadingInstitutes}
             data-ocid="employees.upload_button"
           >
             <FileUp className="w-4 h-4" /> Upload Excel

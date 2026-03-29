@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Lock, Printer } from "lucide-react";
+import { Building2, FileText, Lock, Printer, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import {
@@ -79,89 +79,86 @@ export default function PayslipPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
-          <FileText className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+            <FileText className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold text-gradient">
+              Payslip
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              View and print employee payslips
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gradient">
-            Payslip
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            View and print employee payslips
-          </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={instituteId?.toString() ?? ""}
+            onValueChange={(v) => {
+              setInstituteId(BigInt(v));
+              setEmployeeId(null);
+            }}
+          >
+            <SelectTrigger className="w-40 h-9" data-ocid="payslip.select">
+              <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Institute" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {institutes.map((inst) => (
+                <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
+                  {inst.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={employeeId?.toString() ?? ""}
+            onValueChange={(v) => setEmployeeId(BigInt(v))}
+            disabled={!instituteId}
+          >
+            <SelectTrigger className="w-40 h-9" data-ocid="payslip.select">
+              <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Employee" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {employees.map((emp) => (
+                <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
+                  {emp.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={month.toString()}
+            onValueChange={(v) => setMonth(Number(v))}
+          >
+            <SelectTrigger className="w-32 h-9" data-ocid="payslip.select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {getSessionMonths().map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={session} onValueChange={setSession}>
+            <SelectTrigger className="w-28 h-9" data-ocid="payslip.select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {sessionList.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </motion.div>
-
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="gradient-card rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
-      >
-        <Select
-          value={instituteId?.toString() ?? ""}
-          onValueChange={(v) => {
-            setInstituteId(BigInt(v));
-            setEmployeeId(null);
-          }}
-        >
-          <SelectTrigger data-ocid="payslip.select">
-            <SelectValue placeholder="Select Institute" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {institutes.map((inst) => (
-              <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
-                {inst.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={employeeId?.toString() ?? ""}
-          onValueChange={(v) => setEmployeeId(BigInt(v))}
-          disabled={!instituteId}
-        >
-          <SelectTrigger data-ocid="payslip.select">
-            <SelectValue placeholder="Select Employee" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {employees.map((emp) => (
-              <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
-                {emp.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={month.toString()}
-          onValueChange={(v) => setMonth(Number(v))}
-        >
-          <SelectTrigger data-ocid="payslip.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {getSessionMonths().map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={session} onValueChange={setSession}>
-          <SelectTrigger data-ocid="payslip.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {sessionList.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </motion.div>
 
       {/* Payslip Card */}

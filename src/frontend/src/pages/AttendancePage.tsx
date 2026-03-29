@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Building2,
   CalendarCheck,
   CheckCircle2,
   Clock,
@@ -22,6 +23,7 @@ import {
   RotateCcw,
   Save,
   Trash2,
+  Users,
   XCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -371,97 +373,93 @@ export default function AttendancePage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
-          <CalendarCheck className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
+            <CalendarCheck className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold text-gradient">
+              Attendance
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Track monthly attendance for employees
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gradient">
-            Attendance
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Track monthly attendance for employees
-          </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={instituteId}
+            onValueChange={(v) => {
+              setInstituteId(v);
+              setEmployeeSelection("all");
+            }}
+          >
+            <SelectTrigger className="w-40 h-9" data-ocid="attendance.select">
+              <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Institute" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Institutes</SelectItem>
+              {institutes.map((inst) => (
+                <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
+                  {inst.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={
+              employeeSelection === "all" ? "all" : employeeSelection.toString()
+            }
+            onValueChange={(v) => {
+              if (v === "all") setEmployeeSelection("all");
+              else setEmployeeSelection(BigInt(v));
+            }}
+          >
+            <SelectTrigger className="w-40 h-9" data-ocid="attendance.select">
+              <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="All Employees" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Employees</SelectItem>
+              {employees.map((emp) => (
+                <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
+                  {emp.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={month.toString()}
+            onValueChange={(v) => setMonth(Number(v))}
+          >
+            <SelectTrigger className="w-32 h-9" data-ocid="attendance.select">
+              <CalendarCheck className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {getSessionMonths().map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={session} onValueChange={setSession}>
+            <SelectTrigger className="w-28 h-9" data-ocid="attendance.select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {sessionList.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="gradient-card rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3"
-      >
-        <Select
-          value={instituteId}
-          onValueChange={(v) => {
-            setInstituteId(v);
-            setEmployeeSelection("all");
-          }}
-        >
-          <SelectTrigger data-ocid="attendance.select">
-            <SelectValue placeholder="Select Institute" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            <SelectItem value="all">All Institutes</SelectItem>
-            {institutes.map((inst) => (
-              <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
-                {inst.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={
-            employeeSelection === "all" ? "all" : employeeSelection.toString()
-          }
-          onValueChange={(v) => {
-            if (v === "all") setEmployeeSelection("all");
-            else setEmployeeSelection(BigInt(v));
-          }}
-        >
-          <SelectTrigger data-ocid="attendance.select">
-            <SelectValue placeholder="All Employees" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            <SelectItem value="all">All Employees</SelectItem>
-            {employees.map((emp) => (
-              <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
-                {emp.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={month.toString()}
-          onValueChange={(v) => setMonth(Number(v))}
-        >
-          <SelectTrigger data-ocid="attendance.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {getSessionMonths().map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={session} onValueChange={setSession}>
-          <SelectTrigger data-ocid="attendance.select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[250px] overflow-y-auto">
-            {sessionList.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </motion.div>
 
       {showCalendar && (
