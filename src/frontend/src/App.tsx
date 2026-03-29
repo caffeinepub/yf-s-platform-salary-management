@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import {
+  AlertTriangle,
   BarChart3,
   FileText,
   Home,
@@ -10,6 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { Component, type ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import SyncIndicator from "./components/SyncIndicator";
@@ -18,6 +20,7 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import FeesApp from "./fees/FeesApp";
 import type { FeesPage } from "./fees/types";
 import AttendancePage from "./pages/AttendancePage";
+import ContractWorkersPage from "./pages/ContractWorkersPage";
 import DailyWorkersPage from "./pages/DailyWorkersPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeeDashboardPage from "./pages/EmployeeDashboardPage";
@@ -44,6 +47,7 @@ export type PageName =
   | "salary"
   | "payslip"
   | "dailyWorkers"
+  | "contractWorkers"
   | "reports"
   | "settings";
 
@@ -56,6 +60,42 @@ const EMP_NAV = [
   { id: "profile" as EmpPage, label: "My Profile", icon: User },
   { id: "salaryslips" as EmpPage, label: "Salary Slips", icon: FileText },
 ];
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; errorMessage: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, errorMessage: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMessage: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-8">
+          <AlertTriangle className="w-12 h-12 text-destructive" />
+          <h2 className="text-xl font-display font-bold text-foreground">
+            Something went wrong
+          </h2>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            {this.state.errorMessage}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function EmployeeApp() {
   const { username, logout } = useAuth();
@@ -354,6 +394,8 @@ function AppInner() {
         return <PayslipPage />;
       case "dailyWorkers":
         return <DailyWorkersPage />;
+      case "contractWorkers":
+        return <ContractWorkersPage />;
       case "reports":
         return <ReportsPage />;
       case "settings":
@@ -417,7 +459,11 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <SyncOverlay visible={syncing} />
-        {!syncing && <AppInner />}
+        {!syncing && (
+          <ErrorBoundary>
+            <AppInner />
+          </ErrorBoundary>
+        )}
         <Toaster richColors position="top-right" />
       </AuthProvider>
     </ThemeProvider>

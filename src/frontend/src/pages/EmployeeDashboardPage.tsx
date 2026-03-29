@@ -18,14 +18,14 @@ import { formatDate } from "../utils/dateUtils";
 
 function getEmployees(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
 }
 function getSalaries(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("salaries") || "[]");
+    return JSON.parse(localStorage.getItem("sms_salary") || "[]");
   } catch {
     return [];
   }
@@ -59,21 +59,22 @@ export default function EmployeeDashboardPage() {
   const employees = getEmployees();
   const emp = employees.find(
     (e: any) =>
+      String(e.id) === String(employeeId) ||
       e.employeeId === employeeId ||
-      (
-        e.name.toLowerCase().replace(/\s/g, "").slice(0, 4) + e.employeeId
-      ).toLowerCase() === username.toLowerCase(),
+      e.employeeId === username,
   );
   const extra = emp ? getEmpExtra(emp.employeeId) : {};
 
   const salaries = getSalaries();
   const empSalaries = salaries.filter(
-    (s: any) => s.employeeId === (emp?.employeeId ?? employeeId),
+    (s: any) =>
+      String(s.employeeId) === String(emp?.id) ||
+      s.employeeId === emp?.employeeId,
   );
   const latestSalary = empSalaries.sort((a: any, b: any) => {
-    const aDate = new Date(`${a.month} 1, ${a.year}`);
-    const bDate = new Date(`${b.month} 1, ${b.year}`);
-    return bDate.getTime() - aDate.getTime();
+    const aVal = (a.year ?? 0) * 100 + (a.month ?? 0);
+    const bVal = (b.year ?? 0) * 100 + (b.month ?? 0);
+    return bVal - aVal;
   })[0];
 
   if (!emp) {
@@ -257,7 +258,23 @@ export default function EmployeeDashboardPage() {
                   </p>
                   {latestSalary && (
                     <p className="text-xs text-muted-foreground">
-                      {latestSalary.month} {latestSalary.year}
+                      {typeof latestSalary.month === "number"
+                        ? [
+                            "Jan",
+                            "Feb",
+                            "Mar",
+                            "Apr",
+                            "May",
+                            "Jun",
+                            "Jul",
+                            "Aug",
+                            "Sep",
+                            "Oct",
+                            "Nov",
+                            "Dec",
+                          ][latestSalary.month - 1]
+                        : latestSalary.month}{" "}
+                      {latestSalary.year}
                     </p>
                   )}
                 </div>

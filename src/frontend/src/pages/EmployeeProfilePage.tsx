@@ -33,7 +33,7 @@ import { formatDate } from "../utils/dateUtils";
 
 function getEmployees(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
@@ -49,7 +49,7 @@ function saveEmpExtra(employeeId: string, data: any) {
   localStorage.setItem(`empExtra_${employeeId}`, JSON.stringify(data));
 }
 function saveEmployees(data: any[]) {
-  localStorage.setItem("employees", JSON.stringify(data));
+  localStorage.setItem("sms_employees", JSON.stringify(data));
 }
 
 function ReadOnlyField({
@@ -82,10 +82,9 @@ export default function EmployeeProfilePage() {
   const employees = getEmployees();
   const emp = employees.find(
     (e: any) =>
+      String(e.id) === String(employeeId) ||
       e.employeeId === employeeId ||
-      (
-        e.name.toLowerCase().replace(/\s/g, "").slice(0, 4) + e.employeeId
-      ).toLowerCase() === username.toLowerCase(),
+      e.employeeId === username,
   );
   const extra = emp ? getEmpExtra(emp.employeeId) : {};
 

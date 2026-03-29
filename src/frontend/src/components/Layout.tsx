@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookMarked,
   BookOpen,
+  Briefcase,
   Building2,
   Calendar,
   CalendarCheck,
@@ -35,7 +36,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { AppSystem, PageName } from "../App";
 import { useAuth } from "../context/AuthContext";
@@ -98,6 +99,12 @@ const NAV_ITEMS: NavItem[] = [
     id: "dailyWorkers",
     label: "Daily Workers",
     icon: <HardHat className="w-5 h-5" />,
+    adminOnly: true,
+  },
+  {
+    id: "contractWorkers",
+    label: "Contract Workers",
+    icon: <Briefcase className="w-5 h-5" />,
     adminOnly: true,
   },
   {
@@ -297,6 +304,7 @@ export default function Layout({
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const [syncing, setSyncing] = useState(false);
 
   const visibleSalaryItems = NAV_ITEMS.filter((item) => {
@@ -367,6 +375,7 @@ export default function Layout({
                 key={item.id}
                 onClick={() => {
                   onNavigate(item.id);
+                  mainRef.current?.scrollTo(0, 0);
                   setMobileOpen(false);
                 }}
                 data-ocid={`nav.${item.id}.link`}
@@ -412,6 +421,7 @@ export default function Layout({
                     type="button"
                     onClick={() => {
                       onTallyNavigate(item.id);
+                      mainRef.current?.scrollTo(0, 0);
                       setMobileOpen(false);
                     }}
                     data-ocid={`tally.nav.${item.id}.link`}
@@ -461,6 +471,7 @@ export default function Layout({
                     type="button"
                     onClick={() => {
                       onFeesNavigate(item.id);
+                      mainRef.current?.scrollTo(0, 0);
                       setMobileOpen(false);
                     }}
                     data-ocid={`fees.nav.${item.id}.link`}
@@ -686,7 +697,7 @@ export default function Layout({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={appSystem}

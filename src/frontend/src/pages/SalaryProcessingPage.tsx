@@ -37,6 +37,7 @@ import {
   Copy,
   Info,
   Lock,
+  RefreshCw,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -883,6 +884,16 @@ export default function SalaryProcessingPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={() => {
+              setSalaryInputs({});
+            }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Reset
+          </Button>
         </div>
       </div>
 

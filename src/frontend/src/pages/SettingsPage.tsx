@@ -28,6 +28,7 @@ import {
 import {
   AlertTriangle,
   Banknote,
+  Briefcase,
   Building2,
   Database,
   Download,
@@ -1154,6 +1155,93 @@ function DailyWorkerRateSection() {
   );
 }
 
+function ContractWorkerRateSection() {
+  const [rate, setRate] = useState(() =>
+    Number(localStorage.getItem("contractWorkerRate") || "500"),
+  );
+  const [editing, setEditing] = useState(false);
+  const [tempRate, setTempRate] = useState(String(rate));
+
+  function handleSave() {
+    const v = Number(tempRate);
+    if (Number.isNaN(v) || v < 0) {
+      toast.error("Invalid rate");
+      return;
+    }
+    localStorage.setItem("contractWorkerRate", String(v));
+    setRate(v);
+    setEditing(false);
+    toast.success("Contract worker rate updated.");
+  }
+
+  return (
+    <Card className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent">
+              <Briefcase className="w-5 h-5" />
+            </div>
+            <CardTitle className="text-sm font-display">
+              Contract Worker Rate
+            </CardTitle>
+          </div>
+          <Badge
+            variant="secondary"
+            className="text-xs bg-purple-500/20 text-purple-400"
+          >
+            ₹{rate}/day
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <CardDescription className="text-xs mb-3">
+          Rate per day for contract workers. Used in attendance calculation.
+        </CardDescription>
+        {editing ? (
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min={0}
+              value={tempRate}
+              onChange={(e) => setTempRate(e.target.value)}
+              className="h-8 text-sm"
+              placeholder="Rate per day"
+            />
+            <Button
+              size="sm"
+              className="gradient-primary h-8 text-xs"
+              onClick={handleSave}
+            >
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                setEditing(false);
+                setTempRate(String(rate));
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs gap-1"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="w-3 h-3" /> Edit Rate
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6" data-ocid="settings.page">
@@ -1189,6 +1277,7 @@ export default function SettingsPage() {
         <SalaryConfigSection />
         <LWFConfigSection />
         <DailyWorkerRateSection />
+        <ContractWorkerRateSection />
         <BackupRestoreSection />
         <TaxSlabsSection />
         <SystemInfoSection />

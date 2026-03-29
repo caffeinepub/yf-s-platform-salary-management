@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   Lock,
+  RefreshCw,
   RotateCcw,
   Save,
   Trash2,
@@ -459,6 +460,14 @@ export default function AttendancePage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={handleClear}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Reset
+          </Button>
         </div>
       </motion.div>
 

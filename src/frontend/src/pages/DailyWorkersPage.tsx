@@ -34,12 +34,14 @@ import {
   CalendarDays,
   CheckCircle2,
   Download,
+  FileText,
   HardHat,
   Lock,
   LogOut,
   Pencil,
   Plus,
   Printer,
+  RefreshCw,
   Save,
   Trash2,
   Unlock,
@@ -223,6 +225,8 @@ export default function DailyWorkersPage() {
     {},
   );
   const [deleteperiod, setDeletePeriod] = useState<WorkerPeriod | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [reportFormat, setReportFormat] = useState<"excel" | "pdf">("excel");
 
   // Form state
   const [form, setForm] = useState({ name: "", institute: "" });
@@ -497,7 +501,6 @@ export default function DailyWorkersPage() {
               <SelectValue placeholder="Period" />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
-              <SelectItem value="all">All Periods</SelectItem>
               {yearPeriodsDesc.map((p) => (
                 <SelectItem key={p.label} value={p.label}>
                   {p.label}
@@ -517,6 +520,17 @@ export default function DailyWorkersPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 gap-1"
+            onClick={() => {
+              setForm({ name: "", institute: "" });
+              setEditWorker(null);
+            }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Reset
+          </Button>
           <Button
             size="sm"
             className="gradient-primary gap-1 h-9"
@@ -1042,6 +1056,174 @@ export default function DailyWorkersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Attendance Report floating button */}
+      <div className="fixed bottom-6 right-6 z-10">
+        <Button
+          className="gradient-primary gap-2 shadow-lg"
+          onClick={() => setShowReport(true)}
+        >
+          <FileText className="w-4 h-4" /> Attendance Report
+        </Button>
+      </div>
+
+      {/* Attendance Report Dialog */}
+      <Dialog open={showReport} onOpenChange={setShowReport}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" /> Attendance Report
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Report for: <strong>{filterPeriod || "All Periods"}</strong>
+              {filterInstitute !== "all" && ` · ${filterInstitute}`}
+              {filterWorker !== "all" &&
+                ` · ${workers.find((w) => w.id === filterWorker)?.name}`}
+            </p>
+            {/* Format selector */}
+            <div className="flex items-center gap-3">
+              <Label className="text-sm">Download Format:</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${reportFormat === "excel" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                  onClick={() => setReportFormat("excel")}
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${reportFormat === "pdf" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+                  onClick={() => setReportFormat("pdf")}
+                >
+                  PDF
+                </button>
+              </div>
+            </div>
+            {/* Report preview table */}
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-border/40">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Worker</th>
+                    <th className="px-3 py-2 text-left">Institute</th>
+                    <th className="px-3 py-2 text-left">Period</th>
+                    <th className="px-3 py-2 text-right">Days</th>
+                    <th className="px-3 py-2 text-right">Net Payable</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const reportPeriods = periods.filter((p) => {
+                      const worker = workers.find((w) => w.id === p.workerId);
+                      if (!worker) return false;
+                      if (
+                        filterInstitute !== "all" &&
+                        worker.institute !== filterInstitute
+                      )
+                        return false;
+                      if (filterWorker !== "all" && p.workerId !== filterWorker)
+                        return false;
+                      if (
+                        filterPeriod &&
+                        filterPeriod !== "all" &&
+                        p.periodLabel !== filterPeriod
+                      )
+                        return false;
+                      return true;
+                    });
+                    return reportPeriods.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-3 py-4 text-center text-muted-foreground"
+                        >
+                          No records found
+                        </td>
+                      </tr>
+                    ) : (
+                      reportPeriods.map((p) => {
+                        const worker = workers.find((w) => w.id === p.workerId);
+                        return (
+                          <tr key={p.id} className="border-t border-border/20">
+                            <td className="px-3 py-2">{worker?.name}</td>
+                            <td className="px-3 py-2">{worker?.institute}</td>
+                            <td className="px-3 py-2">{p.periodLabel}</td>
+                            <td className="px-3 py-2 text-right">
+                              {p.presentDays}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold">
+                              ₹{p.netPayable.toLocaleString("en-IN")}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => window.print()}
+              >
+                <Printer className="w-4 h-4" /> Print
+              </Button>
+              <Button
+                className="gradient-primary gap-2"
+                onClick={() => {
+                  const reportPeriods = periods.filter((p) => {
+                    const worker = workers.find((w) => w.id === p.workerId);
+                    if (!worker) return false;
+                    if (
+                      filterInstitute !== "all" &&
+                      worker.institute !== filterInstitute
+                    )
+                      return false;
+                    if (filterWorker !== "all" && p.workerId !== filterWorker)
+                      return false;
+                    if (
+                      filterPeriod &&
+                      filterPeriod !== "all" &&
+                      p.periodLabel !== filterPeriod
+                    )
+                      return false;
+                    return true;
+                  });
+                  if (reportFormat === "excel") {
+                    const header =
+                      "Worker,Institute,Period,Days Present,Rate/Day,Net Payable\n";
+                    const rows = reportPeriods
+                      .map((p) => {
+                        const w = workers.find((x) => x.id === p.workerId);
+                        return `${w?.name},${w?.institute},${p.periodLabel},${p.presentDays},${p.ratePerDay},${p.netPayable}`;
+                      })
+                      .join("\n");
+                    const blob = new Blob([header + rows], {
+                      type: "text/csv",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `attendance-report-${filterPeriod || "all"}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } else {
+                    window.print();
+                  }
+                }}
+              >
+                <Download className="w-4 h-4" /> Download (
+                {reportFormat.toUpperCase()})
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -134,7 +134,21 @@ export default function DashboardPage() {
   const nextYear = curMonthIdx === 11 ? curYear + 1 : curYear;
 
   const currentCalc = calcForMonth(employees);
-  const prevCalc = calcForMonth(employees);
+  const prevSalaryRecords = salaries.filter(
+    (s: any) => s.month === prevMonth1 && s.year === prevYear,
+  );
+  const prevCalc =
+    prevSalaryRecords.length > 0
+      ? prevSalaryRecords.reduce(
+          (acc: any, s: any) => ({
+            gross: acc.gross + Number(s.grossEarnings ?? s.gross ?? 0),
+            pf: acc.pf + Number(s.pfAmount ?? s.totalPF ?? s.pf ?? 0),
+            esic: acc.esic + Number(s.esicAmount ?? s.totalESIC ?? s.esic ?? 0),
+            net: acc.net + Number(s.netEarnings ?? s.netSalary ?? s.net ?? 0),
+          }),
+          { gross: 0, pf: 0, esic: 0, net: 0 },
+        )
+      : calcForMonth(employees);
   const nextCalc = calcForMonth(employees);
 
   // month in sms_salary is stored as a number (1-based)
@@ -206,7 +220,7 @@ export default function DashboardPage() {
     {
       label: `${MONTHS[prevMonthIdx]} ${prevYear}`,
       tag: "Previous",
-      tagColor: "bg-slate-500/20 text-slate-300",
+      tagColor: "bg-slate-600/40 text-slate-100",
       ...prevCalc,
     },
     {

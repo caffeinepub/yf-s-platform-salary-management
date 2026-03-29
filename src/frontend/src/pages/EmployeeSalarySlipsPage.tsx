@@ -26,7 +26,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
-const MONTHS = [
+const _MONTHS = [
   "January",
   "February",
   "March",
@@ -43,14 +43,14 @@ const MONTHS = [
 
 function getEmployees(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
 }
 function getSalaries(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("salaries") || "[]");
+    return JSON.parse(localStorage.getItem("sms_salary") || "[]");
   } catch {
     return [];
   }
@@ -64,7 +64,7 @@ function getEmpExtra(employeeId: string): any {
 }
 function getInstitutes(): any[] {
   try {
-    return JSON.parse(localStorage.getItem("institutes") || "[]");
+    return JSON.parse(localStorage.getItem("sms_institutes") || "[]");
   } catch {
     return [];
   }
@@ -244,20 +244,23 @@ export default function EmployeeSalarySlipsPage() {
   const employees = getEmployees();
   const emp = employees.find(
     (e: any) =>
+      String(e.id) === String(employeeId) ||
       e.employeeId === employeeId ||
-      (
-        e.name.toLowerCase().replace(/\s/g, "").slice(0, 4) + e.employeeId
-      ).toLowerCase() === username.toLowerCase(),
+      e.employeeId === username,
   );
   const extra = emp ? getEmpExtra(emp.employeeId) : {};
 
   const allSalaries = getSalaries();
   const empSalaries = allSalaries
-    .filter((s: any) => s.employeeId === (emp?.employeeId ?? employeeId))
+    .filter(
+      (s: any) =>
+        String(s.employeeId) === String(emp?.id) ||
+        s.employeeId === emp?.employeeId,
+    )
     .sort((a: any, b: any) => {
-      const ai = MONTHS.indexOf(a.month) + Number(a.year) * 12;
-      const bi = MONTHS.indexOf(b.month) + Number(b.year) * 12;
-      return bi - ai;
+      const aVal = (Number(a.year) ?? 0) * 100 + (Number(a.month) ?? 0);
+      const bVal = (Number(b.year) ?? 0) * 100 + (Number(b.month) ?? 0);
+      return bVal - aVal;
     });
 
   const [viewSalary, setViewSalary] = useState<any | null>(null);
@@ -331,7 +334,24 @@ export default function EmployeeSalarySlipsPage() {
                       key={`${sal.month}-${sal.year}`}
                       data-ocid={`salary_slips.item.${idx + 1}`}
                     >
-                      <TableCell className="font-medium">{sal.month}</TableCell>
+                      <TableCell className="font-medium">
+                        {typeof sal.month === "number"
+                          ? [
+                              "January",
+                              "February",
+                              "March",
+                              "April",
+                              "May",
+                              "June",
+                              "July",
+                              "August",
+                              "September",
+                              "October",
+                              "November",
+                              "December",
+                            ][sal.month - 1]
+                          : sal.month}
+                      </TableCell>
                       <TableCell>{sal.year}</TableCell>
                       <TableCell className="text-right">
                         {fmt(sal.basicPay ?? sal.basic ?? 0)}
@@ -387,7 +407,24 @@ export default function EmployeeSalarySlipsPage() {
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
-              Salary Slip — {viewSalary?.month} {viewSalary?.year}
+              Salary Slip —{" "}
+              {typeof viewSalary?.month === "number"
+                ? [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                  ][(viewSalary.month as number) - 1]
+                : viewSalary?.month}{" "}
+              {viewSalary?.year}
             </DialogTitle>
           </DialogHeader>
           {viewSalary && emp && (
