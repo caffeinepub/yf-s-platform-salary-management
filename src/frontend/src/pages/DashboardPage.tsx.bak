@@ -133,27 +133,27 @@ export default function DashboardPage() {
   const nextMonthIdx = curMonthIdx === 11 ? 0 : curMonthIdx + 1;
   const nextYear = curMonthIdx === 11 ? curYear + 1 : curYear;
 
-  // month in sms_salary is stored as a number (1-based)
-  const curMonth1 = curMonthIdx + 1;
-  const prevMonth1 = prevMonthIdx + 1;
-
   const currentCalc = calcForMonth(employees);
   const prevSalaryRecords = salaries.filter(
     (s: any) => s.month === prevMonth1 && s.year === prevYear,
   );
-  const prevMonthProcessed = prevSalaryRecords.length > 0;
-  const prevCalc = prevMonthProcessed
-    ? prevSalaryRecords.reduce(
-        (acc: any, s: any) => ({
-          gross: acc.gross + Number(s.grossEarnings ?? s.gross ?? 0),
-          pf: acc.pf + Number(s.pfAmount ?? s.totalPF ?? s.pf ?? 0),
-          esic: acc.esic + Number(s.esicAmount ?? s.totalESIC ?? s.esic ?? 0),
-          net: acc.net + Number(s.netEarnings ?? s.netSalary ?? s.net ?? 0),
-        }),
-        { gross: 0, pf: 0, esic: 0, net: 0 },
-      )
-    : { gross: 0, pf: 0, esic: 0, net: 0 };
+  const prevCalc =
+    prevSalaryRecords.length > 0
+      ? prevSalaryRecords.reduce(
+          (acc: any, s: any) => ({
+            gross: acc.gross + Number(s.grossEarnings ?? s.gross ?? 0),
+            pf: acc.pf + Number(s.pfAmount ?? s.totalPF ?? s.pf ?? 0),
+            esic: acc.esic + Number(s.esicAmount ?? s.totalESIC ?? s.esic ?? 0),
+            net: acc.net + Number(s.netEarnings ?? s.netSalary ?? s.net ?? 0),
+          }),
+          { gross: 0, pf: 0, esic: 0, net: 0 },
+        )
+      : calcForMonth(employees);
   const nextCalc = calcForMonth(employees);
+
+  // month in sms_salary is stored as a number (1-based)
+  const curMonth1 = curMonthIdx + 1;
+  const prevMonth1 = prevMonthIdx + 1;
 
   const processedThisMonth = salaries.filter(
     (s: { month: number; year: number }) =>
@@ -221,7 +221,6 @@ export default function DashboardPage() {
       label: `${MONTHS[prevMonthIdx]} ${prevYear}`,
       tag: "Previous",
       tagColor: "bg-slate-600/40 text-slate-100",
-      notProcessed: !prevMonthProcessed,
       ...prevCalc,
     },
     {
@@ -237,6 +236,9 @@ export default function DashboardPage() {
       ...nextCalc,
     },
   ];
+
+  // suppress unused var warning
+  void prevMonth1;
 
   if (role === "employee") {
     return (
@@ -337,39 +339,31 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-2">
-                {proj.notProcessed ? (
-                  <p className="text-xs text-muted-foreground italic text-center py-2">
-                    Previous month salary not processed
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Banknote className="w-3.5 h-3.5 text-blue-400" /> Net
-                        Salary
-                      </div>
-                      <span className="font-bold text-sm">{fmt(proj.net)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <ShieldCheck className="w-3.5 h-3.5 text-green-400" />{" "}
-                        Total PF
-                      </div>
-                      <span className="font-semibold text-sm text-green-400">
-                        {fmt(proj.pf)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Landmark className="w-3.5 h-3.5 text-purple-400" />{" "}
-                        Total ESIC
-                      </div>
-                      <span className="font-semibold text-sm text-purple-400">
-                        {fmt(proj.esic)}
-                      </span>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Banknote className="w-3.5 h-3.5 text-blue-400" /> Net
+                    Salary
+                  </div>
+                  <span className="font-bold text-sm">{fmt(proj.net)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> Total
+                    PF
+                  </div>
+                  <span className="font-semibold text-sm text-green-400">
+                    {fmt(proj.pf)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Landmark className="w-3.5 h-3.5 text-purple-400" /> Total
+                    ESIC
+                  </div>
+                  <span className="font-semibold text-sm text-purple-400">
+                    {fmt(proj.esic)}
+                  </span>
+                </div>
               </CardContent>
             </Card>
           ))}
