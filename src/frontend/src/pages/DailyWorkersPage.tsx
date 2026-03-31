@@ -136,12 +136,12 @@ function generatePeriods(
     const start2 = `${year}-${String(m + 1).padStart(2, "0")}-16`;
     const end2 = `${year}-${String(m + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
     periods.push({
-      label: `${monthNames[m]} 1-15 ${year}`,
+      label: `${monthNames[m]} 1-15`,
       start: start1,
       end: end1,
     });
     periods.push({
-      label: `${monthNames[m]} 16-${daysInMonth} ${year}`,
+      label: `${monthNames[m]} 16-${daysInMonth}`,
       start: start2,
       end: end2,
     });
@@ -460,7 +460,7 @@ export default function DailyWorkersPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={filterInstitute} onValueChange={setFilterInstitute}>
             <SelectTrigger className="w-40 h-9">
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
@@ -520,17 +520,6 @@ export default function DailyWorkersPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 gap-1"
-            onClick={() => {
-              setForm({ name: "", institute: "" });
-              setEditWorker(null);
-            }}
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset
-          </Button>
           <Button
             size="sm"
             className="gradient-primary gap-1 h-9"
@@ -923,41 +912,6 @@ export default function DailyWorkersPage() {
                       <Save className="w-3.5 h-3.5" /> Save & Lock
                     </Button>
                   )}
-                </div>
-                <div className="flex justify-end gap-2 mt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs gap-1"
-                    onClick={() => {
-                      const worker = attendanceWorker;
-                      if (!worker || !selectedPeriod) return;
-                      const nl = "\n";
-                      const rows = datesInPeriod
-                        .map(
-                          (d) =>
-                            `${d},${attendanceMap[d] ? "Present" : "Absent"}`,
-                        )
-                        .join(nl);
-                      const csv = `Date,Status${nl}${rows}${nl}${nl}Present Days,${getPresentDays()}${nl}Rate,${dailyWorkerRate}${nl}Net Payable,${getNetPayable()}`;
-                      const blob = new Blob([csv], { type: "text/csv" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `${worker.name}-${selectedPeriod}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    <Download className="w-3 h-3" /> Excel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs gap-1 gradient-primary"
-                    onClick={() => window.print()}
-                  >
-                    <Printer className="w-3 h-3" /> Print / PDF
-                  </Button>
                 </div>
               </>
             )}

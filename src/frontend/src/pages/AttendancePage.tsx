@@ -460,14 +460,6 @@ export default function AttendancePage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            onClick={handleClear}
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset
-          </Button>
         </div>
       </motion.div>
 
@@ -589,6 +581,14 @@ export default function AttendancePage() {
             {isLocked ? (
               <>
                 <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleClear}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Reset
+                </Button>
+                <Button
                   variant="destructive"
                   onClick={() => setConfirmDelete(true)}
                   className="gap-2"
@@ -627,7 +627,7 @@ export default function AttendancePage() {
                             });
                             setDayStatuses(buildDefaultStatuses(month, year));
                             setConfirmDelete(false);
-                            toast.success("Attendance deleted");
+                            toast.error("Attendance deleted");
                           } catch {
                             toast.error("Failed to delete attendance");
                           }

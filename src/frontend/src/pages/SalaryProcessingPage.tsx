@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -137,6 +138,7 @@ type SalaryRecord = {
   esic: number;
   pt: number;
   employmentType?: string;
+  chequePay?: number;
 };
 
 type SalaryInputs = {
@@ -159,6 +161,7 @@ type SalaryInputs = {
   festival: number;
   security: number;
   otherDeductions: number;
+  chequePay: number;
 };
 
 function getDaysInMonthUtil(month: number, year: number) {
@@ -267,6 +270,7 @@ function defaultInputs(emp: LocalEmployee): SalaryInputs {
     festival: 0,
     security: 0,
     otherDeductions: 0,
+    chequePay: 0,
   };
 }
 
@@ -774,6 +778,7 @@ export default function SalaryProcessingPage() {
       month: selectedMonthNum,
       year: selectedYearNum,
       isLocked: true,
+      chequePay: inputs.chequePay ?? 0,
     };
     const updated = salaries.filter(
       (s: SalaryRecord) =>
@@ -799,7 +804,7 @@ export default function SalaryProcessingPage() {
         ),
     );
     saveSalaries(updated);
-    toast.success("Salary record deleted and unlocked.");
+    toast.error("Salary record deleted and unlocked.");
     setDeleteTarget(null);
   }
 
@@ -884,16 +889,6 @@ export default function SalaryProcessingPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            onClick={() => {
-              setSalaryInputs({});
-            }}
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset
-          </Button>
         </div>
       </div>
 
@@ -1107,6 +1102,7 @@ export default function SalaryProcessingPage() {
                                       security: prevSal.security ?? 0,
                                       otherDeductions:
                                         prevSal.otherDeductions ?? 0,
+                                      chequePay: 0,
                                     },
                                   }));
                                   expandEmployee(emp.id);
@@ -1185,6 +1181,7 @@ export default function SalaryProcessingPage() {
                                         security: prevSal.security ?? 0,
                                         otherDeductions:
                                           prevSal.otherDeductions ?? 0,
+                                        chequePay: 0,
                                       },
                                     }));
                                     toast.success(
@@ -1869,6 +1866,27 @@ export default function SalaryProcessingPage() {
                       </div>
 
                       {/* Action */}
+                      {/* Cheque Payment */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Checkbox
+                          id={`chequePay-${emp.id}`}
+                          checked={!!getInputs(emp).chequePay}
+                          onCheckedChange={(checked) =>
+                            setInputField(
+                              String(emp.id),
+                              "chequePay",
+                              checked ? 1 : 0,
+                            )
+                          }
+                          data-ocid="salary.chequepay.checkbox"
+                        />
+                        <label
+                          htmlFor={`chequePay-${emp.id}`}
+                          className="text-xs cursor-pointer select-none text-muted-foreground"
+                        >
+                          Cheque Payment
+                        </label>
+                      </div>
                       <div className="flex justify-end gap-2">
                         <Button
                           size="sm"
@@ -1877,6 +1895,14 @@ export default function SalaryProcessingPage() {
                           onClick={() => setExpandedEmp(null)}
                         >
                           Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1"
+                          onClick={() => setSalaryInputs({})}
+                        >
+                          <RefreshCw className="w-3 h-3" /> Reset
                         </Button>
                         <Button
                           size="sm"
@@ -1893,7 +1919,15 @@ export default function SalaryProcessingPage() {
                   )}
 
                   {isLocked && !isPast && (
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1"
+                        onClick={() => setSalaryInputs({})}
+                      >
+                        <RefreshCw className="w-3 h-3" /> Reset
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

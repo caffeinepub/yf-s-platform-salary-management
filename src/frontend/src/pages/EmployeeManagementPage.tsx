@@ -234,6 +234,70 @@ const DESIGNATIONS: string[] = [
   "Visiting Faculty",
   "Watchman",
 ];
+const DEPARTMENTS: string[] = [
+  "Administration",
+  "Academic",
+  "Finance & Accounts",
+  "Human Resource",
+  "Purchase & Store",
+  "Hostel Management",
+  "Library",
+  "IT Department",
+  "Technical",
+  "Security",
+  "Other",
+];
+
+const BANK_NAMES: string[] = [
+  "Bank of India",
+  "ICICI Bank",
+  "UCO Bank",
+  "HDFC Bank",
+  "State Bank of India",
+];
+
+const BANK_BRANCHES: Record<string, string[]> = {
+  "Bank of India": ["Indpapuri"],
+  "ICICI Bank": ["Arera Colony"],
+  "UCO Bank": ["Piplani"],
+  "HDFC Bank": ["Indpapuri"],
+  "State Bank of India": ["(HET) Piplani", "(K.H) Habibganj"],
+};
+
+const COUNTRY_CODES: string[] = [
+  "+91",
+  "+1",
+  "+44",
+  "+61",
+  "+971",
+  "+65",
+  "+60",
+  "+66",
+  "+49",
+  "+33",
+];
+
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return "";
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${day}-${months[d.getMonth()]},${d.getFullYear()}`;
+}
 
 function mapDesignationToEnum(d: string): Designation {
   const academic = [
@@ -429,7 +493,14 @@ interface EmpForm {
   gender: "male" | "female" | "other" | "";
   category: string;
   employeeType: EmploymentType | "";
-  employeeStatus: "active" | "inactive" | "resigned" | "";
+  employeeStatus:
+    | "active"
+    | "inactive"
+    | "resigned"
+    | "retired"
+    | "relived"
+    | "";
+  countryCode: string;
   phone: string;
   emailId: string;
   joiningDate: string;
@@ -463,6 +534,7 @@ const EMPTY_FORM: EmpForm = {
   category: "",
   employeeType: "",
   employeeStatus: "active",
+  countryCode: "+91",
   phone: "",
   emailId: "",
   joiningDate: "",
@@ -613,6 +685,7 @@ export default function EmployeeManagementPage() {
       category: extra.category || "",
       employeeType: emp.employmentType as EmploymentType | "",
       employeeStatus: extra.employeeStatus || "",
+      countryCode: extra.countryCode || "+91",
       phone: extra.phone || "",
       emailId: extra.emailId || extra.email || "",
       joiningDate: emp.joiningDate,
@@ -834,6 +907,7 @@ export default function EmployeeManagementPage() {
         category: form.category,
         employeeType: form.employeeType,
         employeeStatus: form.employeeStatus,
+        countryCode: form.countryCode,
         phone: form.phone,
         emailId: form.emailId,
         bankName: form.bankName,
@@ -1336,13 +1410,24 @@ export default function EmployeeManagementPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Department</Label>
-                    <Input
+                    <Select
                       value={form.department}
-                      onChange={(e) => setField("department", e.target.value)}
-                      placeholder="e.g., Engineering"
-                      className={inputCls}
-                      data-ocid="employees.department.input"
-                    />
+                      onValueChange={(v) => setField("department", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.department.select"
+                      >
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-56 overflow-y-auto">
+                        {DEPARTMENTS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5 text-xs">
@@ -1394,13 +1479,22 @@ export default function EmployeeManagementPage() {
                       <Calendar className="w-3 h-3" />
                       Date of Birth
                     </Label>
-                    <Input
-                      type="date"
-                      value={form.dob}
-                      onChange={(e) => setField("dob", e.target.value)}
-                      className={inputCls}
-                      data-ocid="employees.dob.input"
-                    />
+                    <div className="relative">
+                      <Input
+                        readOnly
+                        placeholder="DD-Mmm,YYYY"
+                        value={form.dob ? formatDateDisplay(form.dob) : ""}
+                        className={`${inputCls} cursor-pointer`}
+                        data-ocid="employees.dob.input"
+                      />
+                      <input
+                        type="date"
+                        value={form.dob || ""}
+                        onChange={(e) => setField("dob", e.target.value)}
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        tabIndex={-1}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Religion</Label>
@@ -1512,6 +1606,8 @@ export default function EmployeeManagementPage() {
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
                         <SelectItem value="resigned">Resigned</SelectItem>
+                        <SelectItem value="retired">Retired</SelectItem>
+                        <SelectItem value="relived">Relived</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1520,13 +1616,32 @@ export default function EmployeeManagementPage() {
                       <Phone className="w-3 h-3" />
                       Phone
                     </Label>
-                    <Input
-                      value={form.phone}
-                      onChange={(e) => setField("phone", e.target.value)}
-                      placeholder="e.g., 9876543210"
-                      className={inputCls}
-                      data-ocid="employees.phone.input"
-                    />
+                    <div className="flex items-center">
+                      <Select
+                        value={form.countryCode}
+                        onValueChange={(v) => setField("countryCode", v)}
+                      >
+                        <SelectTrigger
+                          className={`${inputCls} w-20 rounded-r-none border-r-0 flex-shrink-0`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[250px] overflow-y-auto">
+                          {COUNTRY_CODES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={form.phone}
+                        onChange={(e) => setField("phone", e.target.value)}
+                        placeholder="e.g., 9876543210"
+                        className={`${inputCls} rounded-l-none flex-1`}
+                        data-ocid="employees.phone.input"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Email ID</Label>
@@ -1544,13 +1659,28 @@ export default function EmployeeManagementPage() {
                       <Calendar className="w-3 h-3" />
                       Joining Date
                     </Label>
-                    <Input
-                      type="date"
-                      value={form.joiningDate}
-                      onChange={(e) => setField("joiningDate", e.target.value)}
-                      className={inputCls}
-                      data-ocid="employees.joiningdate.input"
-                    />
+                    <div className="relative">
+                      <Input
+                        readOnly
+                        placeholder="DD-Mmm,YYYY"
+                        value={
+                          form.joiningDate
+                            ? formatDateDisplay(form.joiningDate)
+                            : ""
+                        }
+                        className={`${inputCls} cursor-pointer`}
+                        data-ocid="employees.joiningdate.input"
+                      />
+                      <input
+                        type="date"
+                        value={form.joiningDate || ""}
+                        onChange={(e) =>
+                          setField("joiningDate", e.target.value)
+                        }
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        tabIndex={-1}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1582,23 +1712,52 @@ export default function EmployeeManagementPage() {
                       <CreditCard className="w-3 h-3" />
                       Bank Name
                     </Label>
-                    <Input
+                    <Select
                       value={form.bankName}
-                      onChange={(e) => setField("bankName", e.target.value)}
-                      placeholder="e.g., State Bank of India"
-                      className={inputCls}
-                      data-ocid="employees.bank_name.input"
-                    />
+                      onValueChange={(v) => {
+                        setField("bankName", v);
+                        const branches = BANK_BRANCHES[v] || [];
+                        setField(
+                          "bankBranch",
+                          branches.length === 1 ? branches[0] : "",
+                        );
+                      }}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.bank_name.select"
+                      >
+                        <SelectValue placeholder="Select bank" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
+                        {BANK_NAMES.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Bank Branch</Label>
-                    <Input
+                    <Select
                       value={form.bankBranch}
-                      onChange={(e) => setField("bankBranch", e.target.value)}
-                      placeholder="e.g., Anand Branch"
-                      className={inputCls}
-                      data-ocid="employees.bank_branch.input"
-                    />
+                      onValueChange={(v) => setField("bankBranch", v)}
+                    >
+                      <SelectTrigger
+                        className={inputCls}
+                        data-ocid="employees.bank_branch.select"
+                      >
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[250px] overflow-y-auto">
+                        {(BANK_BRANCHES[form.bankName] || []).map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5 text-xs">
@@ -1688,49 +1847,59 @@ export default function EmployeeManagementPage() {
                   <div className="space-y-1.5 col-span-2">
                     <Label className="text-xs">LIC No(s)</Label>
                     <div className="space-y-2">
-                      {form.licNos.map((licNo, idx) => (
-                        <div
-                          // biome-ignore lint/suspicious/noArrayIndexKey: LIC entries may be empty
-                          key={`lic-${idx}`}
-                          className="flex items-center gap-2"
+                      {form.licNos.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setField("licNos", [""] as any)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
                         >
-                          <Input
-                            value={licNo}
-                            onChange={(e) => {
-                              const updated = [...form.licNos];
-                              updated[idx] = e.target.value;
-                              setField("licNos", updated as any);
-                            }}
-                            placeholder="e.g., 123456789"
-                            className={inputCls}
-                            data-ocid={`employees.lic.input.${idx + 1}`}
-                          />
-                          {form.licNos.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = form.licNos.filter(
-                                  (_, i) => i !== idx,
-                                );
-                                setField("licNos", updated as any);
-                              }}
-                              className="shrink-0 text-destructive hover:text-destructive/80 transition-colors"
-                              title="Remove this LIC No"
+                          <Plus className="w-3.5 h-3.5" /> Add LIC No
+                        </button>
+                      ) : (
+                        <>
+                          {form.licNos.map((licNo, idx) => (
+                            <div
+                              // biome-ignore lint/suspicious/noArrayIndexKey: LIC entries may be empty
+                              key={`lic-${idx}`}
+                              className="flex items-center gap-2"
                             >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setField("licNos", [...form.licNos, ""] as any)
-                        }
-                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
-                      >
-                        + Add another LIC No.
-                      </button>
+                              <Input
+                                value={licNo}
+                                onChange={(e) => {
+                                  const updated = [...form.licNos];
+                                  updated[idx] = e.target.value;
+                                  setField("licNos", updated as any);
+                                }}
+                                placeholder="e.g., 123456789"
+                                className={inputCls}
+                                data-ocid={`employees.lic.input.${idx + 1}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = form.licNos.filter(
+                                    (_, i) => i !== idx,
+                                  );
+                                  setField("licNos", updated as any);
+                                }}
+                                className="shrink-0 text-destructive hover:text-destructive/80 transition-colors"
+                                title="Remove this LIC No"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setField("licNos", [...form.licNos, ""] as any)
+                            }
+                            className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                          >
+                            + Add another LIC No
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

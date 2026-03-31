@@ -161,6 +161,7 @@ type StoredSalary = {
   netEarnings?: number;
   lwp?: number;
   employmentType?: string;
+  chequePay?: number;
   locked: boolean;
 };
 
@@ -589,7 +590,22 @@ export default function ReportsPage() {
       )
       .join("");
 
-    const bankRows = salaryRows
+    const bankFilteredRows =
+      selectedBank === "cheque"
+        ? salaryRows.filter((r) => (r as any).chequePay === 1)
+        : salaryRows.filter((r) => {
+            if ((r as any).chequePay === 1) return false;
+            if (selectedBank !== "all" && r.emp.bankName !== selectedBank)
+              return false;
+            if (
+              selectedBranch !== "all" &&
+              (r.emp as any).bankBranch !== selectedBranch
+            )
+              return false;
+            return true;
+          });
+
+    const bankRows = bankFilteredRows
       .map(
         (r) => `
         <tr>
@@ -1949,6 +1965,9 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                           </SelectTrigger>
                           <SelectContent className="max-h-[200px] overflow-y-auto">
                             <SelectItem value="all">All Banks</SelectItem>
+                            <SelectItem value="cheque">
+                              Cheque Payment
+                            </SelectItem>
                             {[
                               ...new Set(
                                 employees

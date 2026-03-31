@@ -34,14 +34,12 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  Download,
   FileText,
   GraduationCap,
   Lock,
   LogOut,
   Pencil,
   Plus,
-  Printer,
   RefreshCw,
   Save,
   Trash2,
@@ -153,13 +151,33 @@ function fmtDate(d: string) {
   return `${weekday}, ${day} ${month}`;
 }
 
+const MONTHS_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 function getMonthList(): { label: string; month: number; year: number }[] {
   const list: { label: string; month: number; year: number }[] = [];
   const now = new Date();
-  let y = now.getFullYear();
-  let m = now.getMonth() + 1;
-  while (y > 2004 || (y === 2004 && m >= 4)) {
-    list.push({ label: MONTHS_SHORT[m - 1], month: m, year: y });
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  // Session: Apr of sessionStart to current month
+  // Determine session start year: if current month < 4, session started previous year
+  const sessionStartYear = curMonth >= 4 ? curYear : curYear - 1;
+  let y = curYear;
+  let m = curMonth;
+  while (y > sessionStartYear || (y === sessionStartYear && m >= 4)) {
+    list.push({ label: MONTHS_FULL[m - 1], month: m, year: y });
     m--;
     if (m === 0) {
       m = 12;
@@ -202,7 +220,7 @@ export default function ContractWorkersPage() {
   const [filterInstitute, setFilterInstitute] = useState("all");
   const [filterWorker, setFilterWorker] = useState("all");
   const [selectedMonthLabel, setSelectedMonthLabel] = useState(() => {
-    return MONTHS_SHORT[now.getMonth()];
+    return MONTHS_FULL[now.getMonth()];
   });
   const [selectedSession, setSelectedSession] = useState(() => {
     const m = now.getMonth() + 1;
@@ -228,7 +246,6 @@ export default function ContractWorkersPage() {
   );
   const [deleteRecord, setDeleteRecord] = useState<MonthRecord | null>(null);
   const [showReport, setShowReport] = useState(false);
-  const [reportFormat, setReportFormat] = useState<"excel" | "pdf">("excel");
   const [form, setForm] = useState({ name: "", institute: "" });
   const [transferTo, setTransferTo] = useState("");
 
@@ -498,18 +515,6 @@ export default function ContractWorkersPage() {
               })()}
             </SelectContent>
           </Select>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 gap-1"
-            data-ocid="contract.reset_button"
-            onClick={() => {
-              setForm({ name: "", institute: "" });
-              setEditWorker(null);
-            }}
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset
-          </Button>
           <Button
             size="sm"
             className="gradient-primary gap-1 h-9"
@@ -897,6 +902,17 @@ export default function ContractWorkersPage() {
             </div>
 
             <div className="flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => {
+                  setForm({ name: "", institute: "" });
+                  setEditWorker(null);
+                }}
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reset
+              </Button>
               {currentRecord?.locked ? (
                 <Button
                   variant="outline"
@@ -972,25 +988,7 @@ export default function ContractWorkersPage() {
               {filterWorker !== "all" &&
                 ` · ${workers.find((w) => w.id === filterWorker)?.name}`}
             </p>
-            <div className="flex items-center gap-3">
-              <Label className="text-sm">Format:</Label>
-              <div className="flex gap-2">
-                {(["excel", "pdf"] as const).map((f) => (
-                  <button
-                    type="button"
-                    key={f}
-                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                      reportFormat === f
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border hover:bg-muted"
-                    }`}
-                    onClick={() => setReportFormat(f)}
-                  >
-                    {f.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
+
             <div className="max-h-64 overflow-y-auto rounded-lg border border-border/40">
               <table className="w-full text-xs">
                 <thead className="bg-muted/50">
@@ -1047,59 +1045,6 @@ export default function ContractWorkersPage() {
                   })()}
                 </tbody>
               </table>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                className="gap-2"
-                data-ocid="contract.button"
-                onClick={() => window.print()}
-              >
-                <Printer className="w-4 h-4" /> Print
-              </Button>
-              <Button
-                className="gradient-primary gap-2"
-                data-ocid="contract.primary_button"
-                onClick={() => {
-                  const recs = records.filter((r) => {
-                    const w = workers.find((x) => x.id === r.workerId);
-                    if (!w) return false;
-                    if (
-                      filterInstitute !== "all" &&
-                      w.institute !== filterInstitute
-                    )
-                      return false;
-                    if (filterWorker !== "all" && r.workerId !== filterWorker)
-                      return false;
-                    if (r.monthLabel !== selectedMonthLabel) return false;
-                    return true;
-                  });
-                  if (reportFormat === "excel") {
-                    const header =
-                      "Worker,Institute,Month,Days Present,Rate/Day,Net Payable\n";
-                    const rows = recs
-                      .map((r) => {
-                        const w = workers.find((x) => x.id === r.workerId);
-                        return `${w?.name},${w?.institute},${r.monthLabel},${r.presentDays},${r.ratePerDay},${r.netPayable}`;
-                      })
-                      .join("\n");
-                    const blob = new Blob([header + rows], {
-                      type: "text/csv",
-                    });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `contract-report-${selectedMonthLabel.replace(" ", "-")}.csv`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } else {
-                    window.print();
-                  }
-                }}
-              >
-                <Download className="w-4 h-4" /> Download (
-                {reportFormat.toUpperCase()})
-              </Button>
             </div>
           </div>
         </DialogContent>
