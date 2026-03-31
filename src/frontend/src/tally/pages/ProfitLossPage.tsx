@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp } from "lucide-react";
+import { BarChart3, TrendingUp } from "lucide-react";
 import { getTallyTransactions, getUniqueParties } from "../store";
 import { formatAmount } from "../utils";
 
@@ -27,6 +27,19 @@ export default function ProfitLossPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+          <BarChart3 className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-display font-bold text-foreground">
+            Profit & Loss
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Income and expenditure summary
+          </p>
+        </div>
+      </div>
       <div>
         <h1 className="text-2xl font-display font-bold text-foreground">
           Profit &amp; Loss

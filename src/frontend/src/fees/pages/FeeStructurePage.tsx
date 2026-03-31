@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit2, PlusCircle, Trash2 } from "lucide-react";
+import { Edit2, ListChecks, PlusCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -161,6 +161,19 @@ export default function FeeStructurePage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+          <ListChecks className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-display font-bold text-foreground">
+            Fee Structure
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Configure fee categories and structures
+          </p>
+        </div>
+      </div>
       <div>
         <h1 className="text-2xl font-display font-bold text-foreground">
           Fee Structure

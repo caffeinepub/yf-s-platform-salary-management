@@ -377,9 +377,34 @@ const REPORT_CATEGORIES = [
   },
 ];
 
+function getEmpExtra(employeeId: string): Record<string, unknown> {
+  try {
+    return JSON.parse(localStorage.getItem(`empExtra_${employeeId}`) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function getEmployees(): StoredEmployee[] {
   try {
-    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
+    const emps: StoredEmployee[] = JSON.parse(
+      localStorage.getItem("sms_employees") || "[]",
+    );
+    // Merge extra data (bankName, bankBranch, bankAccountNo, etc.)
+    return emps.map((emp) => {
+      const extra = getEmpExtra(emp.employeeId);
+      return {
+        ...emp,
+        bankName: (extra.bankName as string) || emp.bankName || "",
+        bankAccount:
+          (extra.bankAccountNo as string) ||
+          (extra.bankAccount as string) ||
+          emp.bankAccount ||
+          "",
+        ifsc: (extra.ifscCode as string) || emp.ifsc || "",
+        ...(extra.bankBranch ? { bankBranch: extra.bankBranch as string } : {}),
+      };
+    });
   } catch {
     return [];
   }

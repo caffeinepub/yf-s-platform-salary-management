@@ -353,6 +353,9 @@ function AppInner() {
   const [appSystem, setAppSystem] = useState<AppSystem>("salary");
   const [tallyPage, setTallyPage] = useState<TallyPage>("dashboard");
   const [feesPage, setFeesPage] = useState<FeesPage>("dashboard");
+  const [_historyStack, setHistoryStack] = useState<
+    Array<{ system: AppSystem; page: string }>
+  >([]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -367,6 +370,58 @@ function AppInner() {
       }
     }
   }, [isAuthenticated, role, appSystem]);
+
+  useEffect(() => {
+    const handler = () => {
+      setHistoryStack((s) => {
+        if (s.length === 0) return s;
+        const prev = s[s.length - 1];
+        setAppSystem(prev.system);
+        if (prev.system === "salary") setCurrentPage(prev.page as PageName);
+        else if (prev.system === "tally") setTallyPage(prev.page as TallyPage);
+        else setFeesPage(prev.page as FeesPage);
+        return s.slice(0, -1);
+      });
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
+  const pushHistory = () => {
+    history.pushState({}, "");
+    setHistoryStack((s) => [
+      ...s,
+      {
+        system: appSystem,
+        page:
+          appSystem === "tally"
+            ? tallyPage
+            : appSystem === "fees"
+              ? feesPage
+              : currentPage,
+      },
+    ]);
+  };
+
+  const handleNavigate = (page: PageName) => {
+    pushHistory();
+    setCurrentPage(page);
+  };
+  const handleTallyNavigate = (page: TallyPage) => {
+    pushHistory();
+    setTallyPage(page);
+  };
+  const handleFeesNavigate = (page: FeesPage) => {
+    pushHistory();
+    setFeesPage(page);
+  };
+  const handleSystemChange = (system: AppSystem) => {
+    pushHistory();
+    setAppSystem(system);
+    if (system === "salary") setCurrentPage("dashboard");
+    else if (system === "tally") setTallyPage("dashboard");
+    else setFeesPage("dashboard");
+  };
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -408,18 +463,18 @@ function AppInner() {
   return (
     <Layout
       currentPage={currentPage}
-      onNavigate={setCurrentPage}
+      onNavigate={handleNavigate}
       appSystem={appSystem}
-      onSystemChange={setAppSystem}
+      onSystemChange={handleSystemChange}
       tallyPage={tallyPage}
-      onTallyNavigate={setTallyPage}
+      onTallyNavigate={handleTallyNavigate}
       feesPage={feesPage}
-      onFeesNavigate={setFeesPage}
+      onFeesNavigate={handleFeesNavigate}
     >
       {appSystem === "tally" ? (
-        <TallyApp currentPage={tallyPage} onNavigate={setTallyPage} />
+        <TallyApp currentPage={tallyPage} onNavigate={handleTallyNavigate} />
       ) : appSystem === "fees" ? (
-        <FeesApp currentPage={feesPage} onNavigate={setFeesPage} />
+        <FeesApp currentPage={feesPage} onNavigate={handleFeesNavigate} />
       ) : (
         renderSalaryPage()
       )}

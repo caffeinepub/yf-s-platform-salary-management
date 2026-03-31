@@ -699,11 +699,12 @@ export default function EmployeeManagementPage() {
       esiNumber: extra.esiNumber || extra.esicNumber || "",
       aadhaarNo: extra.aadhaarNo || extra.aadharNumber || "",
       uanNo: extra.uanNo || "",
-      licNos: Array.isArray(extra.licNos)
-        ? extra.licNos
-        : extra.licNo
-          ? [extra.licNo]
-          : [""],
+      licNos:
+        Array.isArray(extra.licNos) && extra.licNos.length > 0
+          ? extra.licNos
+          : extra.licNo
+            ? [extra.licNo]
+            : [],
       ta: String(extra.ta || "0"),
     });
     setFormOpen(true);
@@ -712,12 +713,88 @@ export default function EmployeeManagementPage() {
   const xlsxFileRef = useRef<HTMLInputElement>(null);
 
   const downloadSampleFile = useCallback(() => {
-    const rows = [
-      ["slno", "staffno", "name", "designation", "institute", "status"],
-      ["1", "EMP001", "John Doe", "Manager", "Institute A", "regular"],
-      ["2", "EMP002", "Jane Smith", "Lecturer", "Institute B", "temporary"],
+    const headers = [
+      "slno",
+      "staffno",
+      "name",
+      "designation",
+      "department",
+      "dob",
+      "joiningDate",
+      "status",
+      "institute",
+      "gender",
+      "religion",
+      "pan",
+      "pfNo",
+      "esicNo",
+      "aadhaar",
+      "uan",
+      "phone",
+      "email",
+      "bankName",
+      "bankBranch",
+      "bankAccountNo",
+      "licNos",
+      "address",
+      "employmentType",
     ];
-    const csv = rows.map((r) => r.join(",")).join("\n");
+    const rows = [
+      headers,
+      [
+        "1",
+        "EMP001",
+        "John Doe",
+        "Account Assistant",
+        "Finance & Accounts",
+        "01-Jan,1990",
+        "01-Apr,2020",
+        "Active",
+        "BSM",
+        "Male",
+        "Hindu",
+        "ABCDE1234F",
+        "12345678901",
+        "1234567890123456",
+        "123456789012",
+        "100123456789",
+        "+919876543210",
+        "john@example.com",
+        "Bank of India",
+        "Indpapuri",
+        "0012345678901",
+        "123456789",
+        "123 Main Street",
+        "regular",
+      ],
+      [
+        "2",
+        "EMP002",
+        "Jane Smith",
+        "Lecturer",
+        "Teaching Staff",
+        "15-Mar,1988",
+        "01-Jul,2018",
+        "Active",
+        "VHSS",
+        "Female",
+        "Christian",
+        "FGHIJ5678K",
+        "98765432101",
+        "9876543210987654",
+        "987654321098",
+        "200987654321",
+        "+919812345678",
+        "jane@example.com",
+        "State Bank of India",
+        "(HET) Piplani",
+        "9876543210123",
+        "",
+        "456 Park Avenue",
+        "temporary",
+      ],
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -760,47 +837,91 @@ export default function EmployeeManagementPage() {
           return;
         }
         let added = 0;
+        let skipped = 0;
         let failed = 0;
+        // Build set of existing staffnos for duplicate detection
+        const existingStaffNos = new Set(
+          (allEmployees as any[]).map((e: any) =>
+            String(e.employeeId || "").trim(),
+          ),
+        );
         for (const row of rows) {
           const staffno = String(row.staffno || row.id || "").trim();
           const name = String(row.name || "").trim();
           const designation = String(row.designation || "").trim();
           const institute = String(row.institute || "").trim();
-          const status = String(row.status || "regular")
+          const rawStatus = String(row.status || "regular")
             .trim()
             .toLowerCase();
+          const dob = String(row.dob || "2000-01-01").trim();
+          const joiningDate = String(
+            row.joiningDate || new Date().toISOString().split("T")[0],
+          ).trim();
+          const gender = String(row.gender || "").trim();
+          const religion = String(row.religion || "").trim();
+          const pan = String(row.pan || "").trim();
+          const pfNo = String(row.pfNo || "").trim();
+          const esicNo = String(row.esicNo || "").trim();
+          const aadhaar = String(row.aadhaar || "").trim();
+          const uan = String(row.uan || "").trim();
+          const phone = String(row.phone || "").trim();
+          const email = String(row.email || "").trim();
+          const bankName = String(row.bankName || "").trim();
+          const bankBranch = String(row.bankBranch || "").trim();
+          const bankAccountNo = String(row.bankAccountNo || "").trim();
+          const licNosRaw = String(row.licNos || "").trim();
+          const licNos = licNosRaw
+            ? licNosRaw
+                .split(";")
+                .map((l: string) => l.trim())
+                .filter(Boolean)
+            : [];
+          const address = String(row.address || "-").trim();
+          const employmentType = String(
+            row.employmentType || rawStatus || "regular",
+          )
+            .trim()
+            .toLowerCase();
+          const department = String(row.department || "").trim();
+
           if (!staffno || !name) {
             failed++;
             continue;
           }
-          // Find matching institute
-          const matchedInstitute = institutes.find(
-            (i: Institute) =>
-              i.name.toLowerCase().includes(institute.toLowerCase()) ||
-              institute.toLowerCase().includes(i.name.toLowerCase()),
-          );
+          // Fix 1A: Skip duplicates
+          if (existingStaffNos.has(staffno)) {
+            skipped++;
+            continue;
+          }
+          // Fix 1B: Match institute by shortCode first, then by name
+          const matchedInstitute =
+            institutes.find(
+              (i: Institute) =>
+                (i as any).shortCode &&
+                (i as any).shortCode.toLowerCase() === institute.toLowerCase(),
+            ) ||
+            institutes.find(
+              (i: Institute) =>
+                i.name.toLowerCase().includes(institute.toLowerCase()) ||
+                institute.toLowerCase().includes(i.name.toLowerCase()),
+            );
           const instId = matchedInstitute?.id ?? institutes[0]?.id;
           if (!instId) {
             failed++;
             continue;
           }
-          // Map designation string to enum
-          const desigMap: Record<string, Designation> = {
-            "research engineer": Designation.researchEngineer,
-            professor: Designation.professor,
-            lecturer: Designation.lecturer,
-            "human resources": Designation.humanResources,
-            "admin staff": Designation.adminStaff,
-            officer: Designation.officer,
-            scientist: Designation.scientist,
-            manager: Designation.officer,
-          };
-          const desigKey = designation.toLowerCase();
-          const mappedDesig =
-            Object.entries(desigMap).find(([k]) => desigKey.includes(k))?.[1] ??
-            Designation.officer;
+          // Fix 1C: Handle custom designations - add to DESIGNATIONS list if not found
+          const normalizedDesig = designation.trim();
+          if (normalizedDesig && !DESIGNATIONS.includes(normalizedDesig)) {
+            // add dynamically so it can be used going forward
+            DESIGNATIONS.push(normalizedDesig);
+            DESIGNATIONS.sort();
+          }
+          const mappedDesig = mapDesignationToEnum(
+            normalizedDesig || "Officer",
+          );
           const empType =
-            status === "regular"
+            employmentType === "regular"
               ? EmploymentType.regular
               : EmploymentType.temporary;
           try {
@@ -810,10 +931,32 @@ export default function EmployeeManagementPage() {
               instituteId: BigInt(instId),
               designation: mappedDesig,
               employmentType: empType,
-              joiningDate: new Date().toISOString().split("T")[0],
-              address: "-",
-              dob: "2000-01-01",
+              joiningDate:
+                joiningDate || new Date().toISOString().split("T")[0],
+              address: address || "-",
+              dob: dob || "2000-01-01",
               basicSalary: BigInt(0),
+            });
+            // Save extra fields
+            saveEmpExtra(staffno, {
+              designation: normalizedDesig || "",
+              department,
+              gender,
+              religion,
+              panNo: pan,
+              pfNumber: pfNo,
+              esiNumber: esicNo,
+              aadhaarNo: aadhaar,
+              uanNo: uan,
+              phone,
+              emailId: email,
+              bankName,
+              bankBranch,
+              bankAccountNo,
+              licNos,
+              address,
+              employeeType: employmentType,
+              institute: matchedInstitute?.name || "",
             });
             // Auto-generate credentials
             const autoUser = (
@@ -844,7 +987,11 @@ export default function EmployeeManagementPage() {
         }
         if (added > 0)
           toast.success(
-            `Added ${added} employee${added > 1 ? "s" : ""} successfully${failed > 0 ? `, ${failed} failed` : ""}`,
+            `Added ${added} employee${added > 1 ? "s" : ""} successfully${skipped > 0 ? `, ${skipped} skipped (duplicate)` : ""}${failed > 0 ? `, ${failed} failed` : ""}`,
+          );
+        else if (skipped > 0)
+          toast.info(
+            `All ${skipped} employees already exist (skipped duplicates).`,
           );
         else
           toast.error(
@@ -854,7 +1001,7 @@ export default function EmployeeManagementPage() {
         toast.error("Failed to parse file. Please check the format.");
       }
     },
-    [institutes, addMutation],
+    [institutes, addMutation, allEmployees],
   );
 
   const setField = (field: keyof EmpForm, value: string) =>
@@ -1705,75 +1852,76 @@ export default function EmployeeManagementPage() {
                     <CreditCard className="w-3.5 h-3.5" />
                     Bank &amp; ID Details
                   </p>
+                  <div className="mb-3 p-3 rounded-lg border border-border/40 bg-muted/20">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">
+                      Bank Account
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Bank Name</Label>
+                        <Select
+                          value={form.bankName}
+                          onValueChange={(v) => {
+                            setField("bankName", v);
+                            const branches = BANK_BRANCHES[v] || [];
+                            setField(
+                              "bankBranch",
+                              branches.length === 1 ? branches[0] : "",
+                            );
+                          }}
+                        >
+                          <SelectTrigger
+                            className={inputCls}
+                            data-ocid="employees.bank_name.select"
+                          >
+                            <SelectValue placeholder="Select bank" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[250px] overflow-y-auto">
+                            {BANK_NAMES.map((b) => (
+                              <SelectItem key={b} value={b}>
+                                {b}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Branch</Label>
+                        <Select
+                          value={form.bankBranch}
+                          onValueChange={(v) => setField("bankBranch", v)}
+                        >
+                          <SelectTrigger
+                            className={inputCls}
+                            data-ocid="employees.bank_branch.select"
+                          >
+                            <SelectValue placeholder="Select branch" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[250px] overflow-y-auto">
+                            {(BANK_BRANCHES[form.bankName] || []).map((b) => (
+                              <SelectItem key={b} value={b}>
+                                {b}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">A/C No.</Label>
+                        <Input
+                          value={form.bankAccountNo}
+                          onChange={(e) =>
+                            setField("bankAccountNo", e.target.value)
+                          }
+                          placeholder="e.g., 0012345678901"
+                          className={inputCls}
+                          data-ocid="employees.bank_account.input"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-1.5 text-xs">
-                      <CreditCard className="w-3 h-3" />
-                      Bank Name
-                    </Label>
-                    <Select
-                      value={form.bankName}
-                      onValueChange={(v) => {
-                        setField("bankName", v);
-                        const branches = BANK_BRANCHES[v] || [];
-                        setField(
-                          "bankBranch",
-                          branches.length === 1 ? branches[0] : "",
-                        );
-                      }}
-                    >
-                      <SelectTrigger
-                        className={inputCls}
-                        data-ocid="employees.bank_name.select"
-                      >
-                        <SelectValue placeholder="Select bank" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[250px] overflow-y-auto">
-                        {BANK_NAMES.map((b) => (
-                          <SelectItem key={b} value={b}>
-                            {b}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Bank Branch</Label>
-                    <Select
-                      value={form.bankBranch}
-                      onValueChange={(v) => setField("bankBranch", v)}
-                    >
-                      <SelectTrigger
-                        className={inputCls}
-                        data-ocid="employees.bank_branch.select"
-                      >
-                        <SelectValue placeholder="Select branch" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[250px] overflow-y-auto">
-                        {(BANK_BRANCHES[form.bankName] || []).map((b) => (
-                          <SelectItem key={b} value={b}>
-                            {b}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-1.5 text-xs">
-                      <CreditCard className="w-3 h-3" />
-                      Bank Account No
-                    </Label>
-                    <Input
-                      value={form.bankAccountNo}
-                      onChange={(e) =>
-                        setField("bankAccountNo", e.target.value)
-                      }
-                      placeholder="e.g., 0012345678901"
-                      className={inputCls}
-                      data-ocid="employees.bank_account.input"
-                    />
-                  </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">IFSC Code</Label>
                     <Input

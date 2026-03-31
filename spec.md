@@ -1,62 +1,39 @@
-# Yf's Platform - Salary Management
+# Yf's Platform - Version 57
 
 ## Current State
-Multi-module HR/payroll platform with Salary Management, TallyBooks, and Fees Manager. Key pages: DailyWorkersPage, ContractWorkersPage, EmployeeManagementPage, SalaryProcessingPage.
+Three-module platform (Salary Management, Tally Records, Fees Manager) with shared Layout sidebar. Employee Management has bulk Excel upload (limited columns), bank info display misalignment, edit form missing LIC management. Bank Statement report doesn't populate banks from employee data. Daily/Contract workers allow adding workers without institute. Salary sidebar has no section groupings. Switching between Salary/Tally/Fees remembers last page. Tally and Fees pages lack standardized page headers. Back button closes the app.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Department dropdown with options: Administration, Academic, Finance & Accounts, Human Resource, Purchase & Store, Hostel Management, Library, IT Department, Technical, Security, Other
-- Country code dropdown before phone input (default +91) in Add Employee form
-- Bank Name dropdown (Bank of India, ICICI Bank, UCO Bank, HDFC Bank, State Bank of India)
-- Bank Branch dropdown based on bank: Bank of India/HDFC → "Indpapuri"; ICICI → "Arera Colony"; UCO → "Piplani"; SBI → "(HET) Piplani", "(K.H) Habibganj"
-- Cheque Payment checkbox in Salary Processing (unchecked by default; when checked shows "Cheque Payment" label)
-- Auto-select branch when bank has only one branch option
+- Excel upload: skip/handle duplicate employees (match by staffno — skip if already exists, show count)
+- Excel upload: match institute by short code (exact match first, then name fallback)
+- Excel upload: if designation from Excel not in enum list, store it as custom string in extra data
+- Expanded Excel columns: slno, staffno, name, designation, department, dob, joiningDate, status, institute, gender, religion, pan, pfNo, esicNo, aadhaar, uan, phone, email, bankName, bankBranch, bankAccountNo, licNos (comma separated), address, employmentType
+- Update sample CSV to include all new columns with example data
+- Page headers for all Tally pages (icon + colored title + description line)
+- Page headers for all Fees pages (icon + colored title + description line)
+- History stack in App for back navigation (salary pages, tally pages, fees pages)
 
 ### Modify
-- **DailyWorkersPage.tsx**: Add `flex-wrap` to header selector row div so selectors wrap on mobile (currently missing unlike ContractWorkersPage)
-- **ContractWorkersPage.tsx**: Fix month selector default — `MONTHS_SHORT[now.getMonth()]` (e.g. "Mar") doesn't match monthList labels which use `MONTHS_FULL` (e.g. "March"); change init to `MONTHS_FULL[now.getMonth()]`
-- **EmployeeManagementPage.tsx** — Add Employee form:
-  - Department: replace `<Input>` with `<Select>` using DEPARTMENTS array
-  - DOB: replace `type="date"` input with overlay pattern — visible text input showing "DD-Mmm,YYYY" format (e.g. "15-Jan,2000"), transparent date input overlaid for picking; readOnly text input + hidden date input
-  - Joining Date: same overlay pattern as DOB
-  - Employee Status: add "Retired" and "Relived" options to existing dropdown
-  - Phone: add country code Select (w-24, rounded-r-none) before the phone Input (rounded-l-none), default +91; save countryCode in empExtra
-  - Bank Name: replace Input with Select (options as above); on bank change, also reset bankBranch to ""
-  - Bank Branch: replace Input with Select; options derived from BANK_BRANCHES[form.bankName]; if bank has only 1 branch, auto-select it via useEffect
-  - LIC No: change default state — if `form.licNos.length === 0`, show only `<button>+ Add LIC No</button>` (no input); once clicked, push "" to licNos, then show input(s) + "+ Add another LIC No" button
-- **SalaryProcessingPage.tsx**:
-  - Add `chequePay?: boolean` to SalaryRecord type
-  - Add `chequePay` boolean to SalaryInputs type (default false)
-  - In processing form, just before the action buttons row, add a checkbox row: `<Checkbox checked={inputs.chequePay} onCheckedChange=.../>` with label "Cheque Payment" (shown only when checked)
-  - Store `chequePay` in SalaryRecord when saving
+- Excel upload: fix institute matching to use shortCode first, then name
+- Excel upload: remove duplicates already in system before adding from Excel (clear all existing employees first since user requested cleanup)
+- Bank fields in employee card display: fix alignment so Bank Name, Branch, A/C No are properly labeled and aligned
+- Bank fields in Edit Employee form: fix layout alignment
+- Edit Employee form: add LIC no management same as Add Employee (start with '+ Add LIC No' button, show inputs on click, unlimited LICs)
+- Bank Statement report: populate bank dropdown from actual employee bank data (read sms_extra localStorage, collect unique bankName values)
+- Daily Workers page: show prompt to add institute if none exist (same as Employee Management), disable Add Worker button
+- Contract Workers page: same institute check as Daily Workers
+- Salary sidebar: group items under section heads like Tally/Fees sidebars (Overview: Dashboard; HR: Institutes, Employees, Salary Details; Payroll: Attendance, Salary Processing, Payslip; Workers: Daily Workers, Contract Workers; Admin: Reports, Settings)
+- App.tsx: when onSystemChange is called (switching Salary/Tally/Fees from menu bar), reset to dashboard page for that system
+- App.tsx/Layout.tsx: implement browser-like history stack so back button navigates step by step within the app instead of closing
 
 ### Remove
-- Department text Input (replaced with Select)
-- Bank Name text Input (replaced with Select)
-- Bank Branch text Input (replaced with Select)
-- Default single empty string in licNos array on form open (keep as empty array `[]`)
+- Nothing removed
 
 ## Implementation Plan
-1. Edit `DailyWorkersPage.tsx`: add `flex-wrap` to header buttons div
-2. Edit `ContractWorkersPage.tsx`: fix `selectedMonthLabel` initial state to use `MONTHS_FULL[now.getMonth()]`
-3. Edit `EmployeeManagementPage.tsx`:
-   a. Add DEPARTMENTS constant and BANK_NAMES/BANK_BRANCHES maps at top of file
-   b. Add `countryCode: string` to EmpForm interface and EMPTY_FORM (default "+91")
-   c. Add `formatDateDisplay` helper function
-   d. Update `openEdit` to read countryCode from extra
-   e. Update `handleSubmit`/`saveEmpExtra` to persist countryCode
-   f. Replace department Input with Select
-   g. Replace DOB Input with overlay pattern
-   h. Replace Joining Date Input with overlay pattern
-   i. Add Retired/Relived to status Select
-   j. Replace phone Input with country-code + phone row
-   k. Replace Bank Name Input with Select (reset branch on change)
-   l. Replace Bank Branch Input with Select + auto-select on single option via useEffect
-   m. Change LIC UI to button-first pattern
-4. Edit `SalaryProcessingPage.tsx`:
-   a. Add `chequePay?: boolean` to SalaryRecord
-   b. Add `chequePay: boolean` to SalaryInputs (default false)
-   c. Pass chequePay through defaultInputs
-   d. Add Checkbox UI before action buttons in each employee card
-   e. Store `chequePay` in the saved SalaryRecord
+1. **EmployeeManagementPage.tsx**: Fix handleBulkUpload — deduplicate by staffno (skip existing), match institute by shortCode first, expand CSV columns, handle custom designations, update downloadSampleFile. Fix bank field alignment in employee card. Fix Edit form LIC management.
+2. **ReportsPage.tsx**: Fix Bank Statement bank selector to read unique banks from employee extra data in localStorage.
+3. **DailyWorkersPage.tsx + ContractWorkersPage.tsx**: Add institute existence check, disable Add Worker until institute exists.
+4. **Layout.tsx (components)**: Group salary NAV_ITEMS under section heads matching TALLY_NAV_GROUPS pattern.
+5. **App.tsx**: Reset tallyPage/feesPage/currentPage to 'dashboard' when system is switched. Add history stack using window.history pushState or internal array, wire popstate/back button.

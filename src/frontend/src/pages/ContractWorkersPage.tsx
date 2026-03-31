@@ -519,6 +519,10 @@ export default function ContractWorkersPage() {
             size="sm"
             className="gradient-primary gap-1 h-9"
             data-ocid="contract.open_modal_button"
+            disabled={institutes.length === 0}
+            title={
+              institutes.length === 0 ? "Please add an institute first" : ""
+            }
             onClick={() => {
               setForm({ name: "", institute: "" });
               setEditWorker(null);

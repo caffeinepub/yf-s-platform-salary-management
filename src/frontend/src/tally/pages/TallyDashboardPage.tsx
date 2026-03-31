@@ -12,6 +12,7 @@ import {
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  BookOpen,
   FileText,
   PlusCircle,
   Scale,
@@ -56,15 +57,20 @@ export default function TallyDashboardPage({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+          <BookOpen className="w-5 h-5 text-white" />
+        </div>
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">
-            Tally Records Dashboard
+          <h1 className="text-xl font-display font-bold text-foreground">
+            Tally Dashboard
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Overview of all accounting transactions
+          <p className="text-sm text-muted-foreground">
+            Overview of your accounting records
           </p>
         </div>
+      </div>
+      <div className="flex items-end justify-end">
         <div className="flex gap-2">
           <Button
             size="sm"

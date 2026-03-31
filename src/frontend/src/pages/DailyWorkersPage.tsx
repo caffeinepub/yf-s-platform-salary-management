@@ -523,6 +523,10 @@ export default function DailyWorkersPage() {
           <Button
             size="sm"
             className="gradient-primary gap-1 h-9"
+            disabled={institutes.length === 0}
+            title={
+              institutes.length === 0 ? "Please add an institute first" : ""
+            }
             onClick={() => {
               setForm({ name: "", institute: "" });
               setEditWorker(null);

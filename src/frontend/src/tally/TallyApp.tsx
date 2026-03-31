@@ -1,3 +1,4 @@
+import { Upload } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import AddTransactionPage from "./pages/AddTransactionPage";
@@ -22,6 +23,19 @@ function TransactionsPage(_: { onNavigate: (p: TallyPage) => void }) {
   const [tab, setTab] = useState<"upload" | "add">("upload");
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+          <Upload className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-display font-bold text-foreground">
+            Transactions
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Upload or manually enter transactions
+          </p>
+        </div>
+      </div>
       <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
         <button
           type="button"

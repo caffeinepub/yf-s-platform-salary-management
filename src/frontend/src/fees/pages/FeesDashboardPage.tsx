@@ -58,15 +58,20 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+          <IndianRupee className="w-5 h-5 text-white" />
+        </div>
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">
+          <h1 className="text-xl font-display font-bold text-foreground">
             Fees Dashboard
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Fee collection overview
+          <p className="text-sm text-muted-foreground">
+            Overview of fee collections
           </p>
         </div>
+      </div>
+      <div className="flex items-end justify-end">
         <div className="flex gap-2">
           <Button
             size="sm"
