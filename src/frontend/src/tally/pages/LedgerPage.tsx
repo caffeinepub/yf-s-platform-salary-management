@@ -53,7 +53,7 @@ export default function LedgerPage() {
           <BookMarked className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-foreground">
+          <h1 className="text-xl font-display font-bold text-gradient">
             Ledger
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -62,7 +62,7 @@ export default function LedgerPage() {
         </div>
       </div>
       <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-display font-bold text-gradient">
           Ledger
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

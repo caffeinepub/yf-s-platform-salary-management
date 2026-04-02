@@ -25,7 +25,7 @@ export default function BalanceSheetPage() {
           <LayoutGrid className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-foreground">
+          <h1 className="text-xl font-display font-bold text-gradient">
             Balance Sheet
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -34,7 +34,7 @@ export default function BalanceSheetPage() {
         </div>
       </div>
       <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-display font-bold text-gradient">
           Balance Sheet
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

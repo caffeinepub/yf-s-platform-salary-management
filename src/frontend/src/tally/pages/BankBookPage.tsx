@@ -31,7 +31,7 @@ export default function BankBookPage() {
           <Building2 className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-foreground">
+          <h1 className="text-xl font-display font-bold text-gradient">
             Bank Book
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -40,7 +40,7 @@ export default function BankBookPage() {
         </div>
       </div>
       <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-display font-bold text-gradient">
           Bank Book
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

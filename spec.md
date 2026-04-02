@@ -1,39 +1,48 @@
-# Yf's Platform - Version 57
+# Yf's Platform - Salary Management
 
 ## Current State
-Three-module platform (Salary Management, Tally Records, Fees Manager) with shared Layout sidebar. Employee Management has bulk Excel upload (limited columns), bank info display misalignment, edit form missing LIC management. Bank Statement report doesn't populate banks from employee data. Daily/Contract workers allow adding workers without institute. Salary sidebar has no section groupings. Switching between Salary/Tally/Fees remembers last page. Tally and Fees pages lack standardized page headers. Back button closes the app.
+Full multi-module platform (Salary Management, TallyBooks, Fees Manager) with React/TypeScript frontend and Motoko backend. Many pages and features exist.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Excel upload: skip/handle duplicate employees (match by staffno — skip if already exists, show count)
-- Excel upload: match institute by short code (exact match first, then name fallback)
-- Excel upload: if designation from Excel not in enum list, store it as custom string in extra data
-- Expanded Excel columns: slno, staffno, name, designation, department, dob, joiningDate, status, institute, gender, religion, pan, pfNo, esicNo, aadhaar, uan, phone, email, bankName, bankBranch, bankAccountNo, licNos (comma separated), address, employmentType
-- Update sample CSV to include all new columns with example data
-- Page headers for all Tally pages (icon + colored title + description line)
-- Page headers for all Fees pages (icon + colored title + description line)
-- History stack in App for back navigation (salary pages, tally pages, fees pages)
+- Settings > User & Password Management: institute selector (default All), employee selector (default All)
+- Reports > Payroll Reports: Consolidated Register report after Bank Statement (format from attachment - summary of salary bills with all columns: Basic Pay, Special Pay, DA, House Rent, Bonus, Conveyance, Washing, LTC Advance, Festival Advance, Incentive, Other Earnings, Gross Salary, House Rent deduction, Electricity, LWF, EPF, VPF, LIC, Employment Tax, Income Tax, Festival Advance, ESIC, Security Deposit, Other Deductions, Total Deductions, Net Payable, Remarks; bank-wise summary table at bottom; Employment Tax institute-wise and Income Tax institute-wise tables; grand total row; prepared by/checked by/secretary/treasurer signature row)
+- Employee Management: download button with Excel/PDF options (default Excel), employee selector below institute selector (default All Employees), employee status shown on employee card
+- Employee Portal: 3-bar hamburger icon to toggle sidebar (like admin), all pages headers with icon + colored head + description line
+- My Salary Slip page: month selector (default latest, descending latest to Apr) + session selector (default latest, descending latest to DOJ year)
+- Salary Details: incentive column after TA column
 
 ### Modify
-- Excel upload: fix institute matching to use shortCode first, then name
-- Excel upload: remove duplicates already in system before adding from Excel (clear all existing employees first since user requested cleanup)
-- Bank fields in employee card display: fix alignment so Bank Name, Branch, A/C No are properly labeled and aligned
-- Bank fields in Edit Employee form: fix layout alignment
-- Edit Employee form: add LIC no management same as Add Employee (start with '+ Add LIC No' button, show inputs on click, unlimited LICs)
-- Bank Statement report: populate bank dropdown from actual employee bank data (read sms_extra localStorage, collect unique bankName values)
-- Daily Workers page: show prompt to add institute if none exist (same as Employee Management), disable Add Worker button
-- Contract Workers page: same institute check as Daily Workers
-- Salary sidebar: group items under section heads like Tally/Fees sidebars (Overview: Dashboard; HR: Institutes, Employees, Salary Details; Payroll: Attendance, Salary Processing, Payslip; Workers: Daily Workers, Contract Workers; Admin: Reports, Settings)
-- App.tsx: when onSystemChange is called (switching Salary/Tally/Fees from menu bar), reset to dashboard page for that system
-- App.tsx/Layout.tsx: implement browser-like history stack so back button navigates step by step within the app instead of closing
+- Settings > User & Password Management: fix employee fetching from localStorage (key: sms_employees)
+- Settings: merge LWF Configuration inside Salary Structure Configuration; applicable months order Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec, Jan, Feb, Mar
+- Settings > Tax Slab Reference: remove ⓘ icon before PT and IT headings
+- Reports: remove "Yf's Platform" text at top of all report types
+- Payslip page: institute selector default All, employee selector default All, month selector shows all months when previous session selected
+- All pages with month selector: when previous session selected, auto-select the latest available month (not just show April)
+- Salary Processing: when previous month/session is selected, all inputs locked/read-only (not editable)
+- Attendance: when previous month/session selected, attendance locked/non-editable
+- Employee Management: fix Excel upload to import ALL fields (not just id, name, institute)
+- Employee Management > Add Employee: fix spelling "Relieved" (not "Relived")
+- Employee Portal Welcome back section: fix background color in day/light mode
+- My Profile page: move Cancel/Save buttons to bottom (not top); add country code dropdown (+91 default) before phone number
+- Login page: pressing back should close/exit website; after admin login always open dashboard (not last visited page)
+- Daily Rated: period selector format "1-15 Apr" not "Apr 1-15"; list descending (latest first); default latest period selected
+- Sidebar logo: fix broken/blank logo image
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. **EmployeeManagementPage.tsx**: Fix handleBulkUpload — deduplicate by staffno (skip existing), match institute by shortCode first, expand CSV columns, handle custom designations, update downloadSampleFile. Fix bank field alignment in employee card. Fix Edit form LIC management.
-2. **ReportsPage.tsx**: Fix Bank Statement bank selector to read unique banks from employee extra data in localStorage.
-3. **DailyWorkersPage.tsx + ContractWorkersPage.tsx**: Add institute existence check, disable Add Worker until institute exists.
-4. **Layout.tsx (components)**: Group salary NAV_ITEMS under section heads matching TALLY_NAV_GROUPS pattern.
-5. **App.tsx**: Reset tallyPage/feesPage/currentPage to 'dashboard' when system is switched. Add history stack using window.history pushState or internal array, wire popstate/back button.
+1. Fix SettingsPage.tsx: employee fetching uses correct key, add institute/employee selectors, merge LWF into salary structure config, fix months order Apr-Mar, remove ⓘ before PT/IT heads
+2. Fix ReportsPage.tsx: remove "Yf's Platform" header text from all report outputs, add Consolidated Register tab in Payroll Reports
+3. Fix PayslipPage.tsx: default All for institute/employee selectors, month selector shows all months when previous session
+4. Fix global month selector behavior: when previous session selected auto-pick latest month (in AttendancePage, SalaryProcessingPage, PayslipPage, ContractWorkersPage, etc.)
+5. Fix SalaryProcessingPage.tsx: lock all inputs when previous month/session selected
+6. Fix AttendancePage.tsx: lock attendance when previous month/session selected
+7. Fix SalaryDetailsPage.tsx: add incentive column after TA
+8. Fix EmployeeManagementPage.tsx: fix Excel upload to parse all columns, add download button (Excel/PDF), add employee selector, show status on card, fix spelling "Relieved"
+9. Fix Employee portal pages: fix welcome back background in day mode, add hamburger sidebar toggle, add standard headers to all pages, fix My Profile buttons + country code, fix My Salary Slip selectors
+10. Fix LoginPage.tsx/App.tsx: back button on login closes website, admin login always goes to dashboard
+11. Fix DailyWorkersPage.tsx: period format "1-15 Apr", descending order, default latest
+12. Fix sidebar logo loading issue

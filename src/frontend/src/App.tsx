@@ -267,10 +267,24 @@ function EmployeeApp() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="md:hidden text-muted-foreground hover:text-foreground"
-              onClick={() => setMobileOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setMobileOpen((v: boolean) => !v)}
             >
-              <Home className="w-5 h-5" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
             </button>
             <h2 className="font-display font-semibold text-foreground/90">
               {activeLabel}
@@ -353,6 +367,14 @@ function AppInner() {
   const [appSystem, setAppSystem] = useState<AppSystem>("salary");
   const [tallyPage, setTallyPage] = useState<TallyPage>("dashboard");
   const [feesPage, setFeesPage] = useState<FeesPage>("dashboard");
+
+  // Always reset to dashboard when user authenticates
+  useEffect(() => {
+    if (isAuthenticated && role === "admin") {
+      setCurrentPage("dashboard");
+      setAppSystem("salary");
+    }
+  }, [isAuthenticated, role]);
   const [_historyStack, setHistoryStack] = useState<
     Array<{ system: AppSystem; page: string }>
   >([]);

@@ -73,17 +73,30 @@ const SHORT_MONTH = [
   "Dec",
 ];
 
-function getSessionMonths(): { value: string; label: string }[] {
+function getSessionMonths(
+  selectedSession?: string,
+): { value: string; label: string }[] {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
+  const currentSession = getCurrentSession();
+  const isCurrentSession =
+    !selectedSession || selectedSession === currentSession;
   const months: { value: string; label: string }[] = [];
-  if (currentMonth >= 4) {
-    for (let m = 4; m <= currentMonth; m++)
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+  if (isCurrentSession) {
+    if (currentMonth >= 4) {
+      for (let m = 4; m <= currentMonth; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    } else {
+      for (let m = 4; m <= 12; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      for (let m = 1; m <= currentMonth; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    }
   } else {
+    // Past session: show all 12 months Apr-Mar
     for (let m = 4; m <= 12; m++)
       months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
-    for (let m = 1; m <= currentMonth; m++)
+    for (let m = 1; m <= 3; m++)
       months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
   }
   return months.reverse();
@@ -193,6 +206,18 @@ function getDayLabel(data: DayData): string {
   return data.leaveType ?? "LWP";
 }
 
+function getLatestMonthForSession(session: string): number {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentY = now.getFullYear();
+  const currentSession =
+    currentMonth >= 4
+      ? `${currentY}-${String(currentY + 1).slice(2)}`
+      : `${currentY - 1}-${String(currentY).slice(2)}`;
+  if (session === currentSession) return currentMonth;
+  return 3; // Past session - latest is March
+}
+
 export default function AttendancePage() {
   const now = new Date();
   const [instituteId, setInstituteId] = useState<string>("all");
@@ -203,6 +228,18 @@ export default function AttendancePage() {
   const [session, setSession] = useState(getCurrentSession());
   const sessionList = getSessionList();
   const [dayStatuses, setDayStatuses] = useState<Record<string, DayData>>({});
+
+  const derivedYearForPast = (() => {
+    const sessionStart = Number.parseInt(session.split("-")[0]);
+    if (month >= 4) return sessionStart;
+    return sessionStart + 1;
+  })();
+  const isPastPeriod = (() => {
+    const curM = now.getMonth() + 1;
+    const curY = now.getFullYear();
+    const selY = derivedYearForPast;
+    return selY < curY || (selY === curY && month < curM);
+  })();
   const [dialogDay, setDialogDay] = useState<string | null>(null);
 
   const { data: institutes = [] } = useGetAllInstitutes();
@@ -441,14 +478,20 @@ export default function AttendancePage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
-              {getSessionMonths().map((m) => (
+              {getSessionMonths(session).map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={session} onValueChange={setSession}>
+          <Select
+            value={session}
+            onValueChange={(newSession) => {
+              setSession(newSession);
+              setMonth(getLatestMonthForSession(newSession));
+            }}
+          >
             <SelectTrigger className="w-28 h-9" data-ocid="attendance.select">
               <SelectValue />
             </SelectTrigger>
@@ -463,6 +506,27 @@ export default function AttendancePage() {
         </div>
       </motion.div>
 
+      {showCalendar && isPastPeriod && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-4 h-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m0-6v.01M12 3C7.03 3 3 7.03 3 12s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"
+            />
+          </svg>
+          Previous period — view only. Attendance cannot be edited for past
+          months.
+        </div>
+      )}
       {showCalendar && (
         <>
           {/* Summary cards */}
@@ -522,11 +586,11 @@ export default function AttendancePage() {
                         type="button"
                         key={day.key}
                         onClick={() => handleDayClick(day.key)}
-                        disabled={isLocked}
+                        disabled={isLocked || isPastPeriod}
                         className={`relative rounded-lg border p-1.5 flex flex-col items-center transition-all duration-150 ${
                           colorClass
                         } ${
-                          isLocked
+                          isLocked || isPastPeriod
                             ? "cursor-not-allowed opacity-80"
                             : "cursor-pointer hover:scale-105 hover:shadow-md"
                         }`}

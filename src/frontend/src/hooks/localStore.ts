@@ -150,6 +150,10 @@ export function localDeleteEmployee(id: number) {
   );
 }
 
+export function localDeleteAllEmployees() {
+  saveAll(KEYS.employees, []);
+}
+
 // ─── Attendance ────────────────────────────────────────────────────────────────────────
 
 export interface LocalAttendanceRecord {

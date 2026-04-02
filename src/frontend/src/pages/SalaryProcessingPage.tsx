@@ -73,15 +73,28 @@ const MONTHS = [
   "December",
 ];
 
-function getSessionMonthNames(): string[] {
+function getSessionMonthNames(selectedSession?: string): string[] {
   const now = new Date();
   const currentMonthIdx = now.getMonth();
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth() + 1;
+  const currentSession =
+    currentM >= 4
+      ? `${currentY}-${String(currentY + 1).slice(2)}`
+      : `${currentY - 1}-${String(currentY).slice(2)}`;
+  const isCurrentSession =
+    !selectedSession || selectedSession === currentSession;
   const result: string[] = [];
-  if (currentMonthIdx >= 3) {
-    for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  if (isCurrentSession) {
+    if (currentMonthIdx >= 3) {
+      for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    } else {
+      for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
+      for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    }
   } else {
     for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
-    for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    for (let i = 0; i <= 2; i++) result.push(MONTHS[i]);
   }
   return result.reverse();
 }
@@ -870,14 +883,32 @@ export default function SalaryProcessingPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
-              {getSessionMonthNames().map((m) => (
+              {getSessionMonthNames(selectedSession).map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedSession} onValueChange={setSelectedSession}>
+          <Select
+            value={selectedSession}
+            onValueChange={(newSession) => {
+              setSelectedSession(newSession);
+              // Auto-select latest month for this session
+              const curM = now.getMonth() + 1;
+              const curY = now.getFullYear();
+              const _sessStart = Number.parseInt(newSession.split("-")[0]);
+              const thisSessStr =
+                curM >= 4
+                  ? `${curY}-${String(curY + 1).slice(2)}`
+                  : `${curY - 1}-${String(curY).slice(2)}`;
+              if (newSession === thisSessStr) {
+                setSelectedMonth(MONTHS[curM - 1]);
+              } else {
+                setSelectedMonth("March");
+              }
+            }}
+          >
             <SelectTrigger className="w-28 h-9">
               <SelectValue />
             </SelectTrigger>

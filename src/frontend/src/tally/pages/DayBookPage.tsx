@@ -43,7 +43,7 @@ export default function DayBookPage() {
           <Calendar className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-foreground">
+          <h1 className="text-xl font-display font-bold text-gradient">
             Day Book
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -52,7 +52,7 @@ export default function DayBookPage() {
         </div>
       </div>
       <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-display font-bold text-gradient">
           Day Book
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

@@ -52,6 +52,7 @@ export default function SalaryDetailsPage() {
       {
         basic: string;
         ta: string;
+        incentive: string;
         vpfMode: string;
         vpfValue: string;
         licAmounts: string[];
@@ -85,7 +86,7 @@ export default function SalaryDetailsPage() {
 
   function getEdit(
     empId: string,
-    field: "basic" | "ta" | "vpfMode" | "vpfValue",
+    field: "basic" | "ta" | "incentive" | "vpfMode" | "vpfValue",
     fallback: string,
   ) {
     return salaryEdits[empId]?.[field] ?? fallback;
@@ -113,6 +114,7 @@ export default function SalaryDetailsPage() {
       const existing = prev[empId] ?? {
         basic: "0",
         ta: "0",
+        incentive: "0",
         vpfMode: "percent",
         vpfValue: "0",
         licAmounts: Array(count).fill("0"),
@@ -127,13 +129,14 @@ export default function SalaryDetailsPage() {
 
   function setEditField(
     empId: string,
-    field: "basic" | "ta" | "vpfMode" | "vpfValue",
+    field: "basic" | "ta" | "incentive" | "vpfMode" | "vpfValue",
     value: string,
   ) {
     setSalaryEdits((prev) => {
       const existing = prev[empId] ?? {
         basic: "0",
         ta: "0",
+        incentive: "0",
         vpfMode: "percent",
         vpfValue: "0",
         licAmounts: [],
@@ -148,6 +151,9 @@ export default function SalaryDetailsPage() {
         salaryEdits[emp.employeeId]?.basic ?? emp.basicSalary.toString();
       const extra = getEmpExtra(emp.employeeId);
       const ta = salaryEdits[emp.employeeId]?.ta ?? String(extra.ta || "0");
+      const incentiveVal =
+        salaryEdits[emp.employeeId]?.incentive ??
+        String(extra.incentive || "0");
       const vpfMode =
         salaryEdits[emp.employeeId]?.vpfMode ?? extra.vpfMode ?? "percent";
       const vpfValue =
@@ -170,6 +176,7 @@ export default function SalaryDetailsPage() {
       saveEmpExtra(emp.employeeId, {
         ...extra,
         ta: Number(ta) || 0,
+        incentive: Number(incentiveVal) || 0,
         vpfMode,
         vpfValue: Number(vpfValue) || 0,
         licAmounts: licAmounts.map(Number),
@@ -299,6 +306,9 @@ export default function SalaryDetailsPage() {
                       <TableHead className="text-xs font-semibold text-muted-foreground w-28">
                         TA (₹)
                       </TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground w-28">
+                        Incentive (₹)
+                      </TableHead>
                       <TableHead className="text-xs font-semibold text-muted-foreground w-52">
                         VPF
                       </TableHead>
@@ -390,6 +400,26 @@ export default function SalaryDetailsPage() {
                               className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
                               placeholder="0"
                               data-ocid={`salary_details.ta.input.${idx + 1}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={getEdit(
+                                emp.employeeId,
+                                "incentive",
+                                String(extra.incentive || "0"),
+                              )}
+                              onChange={(e) =>
+                                setEditField(
+                                  emp.employeeId,
+                                  "incentive",
+                                  e.target.value,
+                                )
+                              }
+                              className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
+                              placeholder="0"
+                              data-ocid={`salary_details.incentive.input.${idx + 1}`}
                             />
                           </TableCell>
                           <TableCell>

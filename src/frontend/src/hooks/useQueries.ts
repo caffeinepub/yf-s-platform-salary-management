@@ -11,6 +11,7 @@ import {
   localAddDailyWorker,
   localAddEmployee,
   localAddInstitute,
+  localDeleteAllEmployees,
   localDeleteAttendance,
   localDeleteDailyWorker,
   localDeleteEmployee,
@@ -451,6 +452,16 @@ export function useDeleteEmployee() {
   return useMutation({
     mutationFn: async (id: bigint) => {
       localDeleteEmployee(Number(id));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}
+
+export function useDeleteAllEmployees() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      localDeleteAllEmployees();
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
   });

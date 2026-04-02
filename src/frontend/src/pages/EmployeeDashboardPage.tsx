@@ -138,17 +138,13 @@ export default function EmployeeDashboardPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl p-6 relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, oklch(0.18 0.08 260), oklch(0.15 0.08 290))",
-          border: "1px solid oklch(0.35 0.14 260 / 0.5)",
-        }}
+        className="rounded-2xl p-6 relative overflow-hidden bg-primary/10 border border-primary/20"
+        style={{}}
       >
         <motion.div
           animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.35, 0.2] }}
           transition={{ duration: 5, repeat: Number.POSITIVE_INFINITY }}
-          className="absolute right-0 top-0 w-64 h-64 rounded-full blur-3xl pointer-events-none"
+          className="absolute right-0 top-0 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-30"
           style={{
             background: "oklch(0.55 0.28 260)",
             transform: "translate(30%, -30%)",
@@ -176,10 +172,7 @@ export default function EmployeeDashboardPage() {
             >
               Welcome back, {emp.name}!
             </h1>
-            <p
-              className="text-sm mt-1"
-              style={{ color: "oklch(0.62 0.10 260)" }}
-            >
+            <p className="text-sm mt-1 text-muted-foreground">
               {extra.designation || emp.designation || "Employee"} &bull;{" "}
               {extra.department || emp.department || "—"}
             </p>

@@ -37,23 +37,49 @@ const MONTH_NAMES = [
   "December",
 ];
 
-function getSessionMonths(): { value: string; label: string }[] {
+function getSessionMonths(
+  selectedSession?: string,
+): { value: string; label: string }[] {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
+  const currentY = now.getFullYear();
+  const currentSession =
+    currentMonth >= 4
+      ? `${currentY}-${String(currentY + 1).slice(2)}`
+      : `${currentY - 1}-${String(currentY).slice(2)}`;
+  const isCurrentSession =
+    !selectedSession || selectedSession === currentSession;
   const months: { value: string; label: string }[] = [];
-  if (currentMonth >= 4) {
-    for (let m = 4; m <= currentMonth; m++) {
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+  if (isCurrentSession) {
+    if (currentMonth >= 4) {
+      for (let m = 4; m <= currentMonth; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+    } else {
+      for (let m = 4; m <= 12; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      for (let m = 1; m <= currentMonth; m++)
+        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
     }
   } else {
-    for (let m = 4; m <= 12; m++) {
+    for (let m = 4; m <= 12; m++)
       months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
-    }
-    for (let m = 1; m <= currentMonth; m++) {
+    for (let m = 1; m <= 3; m++)
       months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
-    }
   }
   return months.reverse();
+}
+
+function getLatestMonthForSession(session: string): number {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentY = now.getFullYear();
+  const currentSession =
+    currentMonth >= 4
+      ? `${currentY}-${String(currentY + 1).slice(2)}`
+      : `${currentY - 1}-${String(currentY).slice(2)}`;
+  if (session === currentSession) return currentMonth;
+  // For past sessions, latest = March (3)
+  return 3;
 }
 
 const fmt = (n: bigint | number) => `₹${Number(n).toLocaleString("en-IN")}`;
@@ -64,6 +90,11 @@ export default function PayslipPage() {
   const [employeeId, setEmployeeId] = useState<bigint | null>(null);
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [session, setSession] = useState(getCurrentSession());
+
+  function handleSessionChange(newSession: string) {
+    setSession(newSession);
+    setMonth(getLatestMonthForSession(newSession));
+  }
   const sessionList = getSessionList();
   const year = getYearFromSession(session, month);
 
@@ -96,17 +127,18 @@ export default function PayslipPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select
-            value={instituteId?.toString() ?? ""}
+            value={instituteId?.toString() ?? "all"}
             onValueChange={(v) => {
-              setInstituteId(BigInt(v));
+              setInstituteId(v === "all" ? null : BigInt(v));
               setEmployeeId(null);
             }}
           >
             <SelectTrigger className="w-40 h-9" data-ocid="payslip.select">
               <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
-              <SelectValue placeholder="Institute" />
+              <SelectValue placeholder="All Institutes" />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
                 <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
                   {inst.name}
@@ -115,15 +147,15 @@ export default function PayslipPage() {
             </SelectContent>
           </Select>
           <Select
-            value={employeeId?.toString() ?? ""}
-            onValueChange={(v) => setEmployeeId(BigInt(v))}
-            disabled={!instituteId}
+            value={employeeId?.toString() ?? "all"}
+            onValueChange={(v) => setEmployeeId(v === "all" ? null : BigInt(v))}
           >
             <SelectTrigger className="w-40 h-9" data-ocid="payslip.select">
               <Users className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
-              <SelectValue placeholder="Employee" />
+              <SelectValue placeholder="All Employees" />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
+              <SelectItem value="all">All Employees</SelectItem>
               {employees.map((emp) => (
                 <SelectItem key={emp.id.toString()} value={emp.id.toString()}>
                   {emp.name}
@@ -139,14 +171,14 @@ export default function PayslipPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
-              {getSessionMonths().map((m) => (
+              {getSessionMonths(session).map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={session} onValueChange={setSession}>
+          <Select value={session} onValueChange={handleSessionChange}>
             <SelectTrigger className="w-28 h-9" data-ocid="payslip.select">
               <SelectValue />
             </SelectTrigger>

@@ -70,15 +70,28 @@ const SESSION_YEAR_LIST = (() => {
   return result;
 })();
 
-function getSessionMonthNames(): string[] {
+function getSessionMonthNames(selectedSession?: string): string[] {
   const now = new Date();
   const currentMonthIdx = now.getMonth();
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth() + 1;
+  const currentSession =
+    currentM >= 4
+      ? `${currentY}-${String(currentY + 1).slice(2)}`
+      : `${currentY - 1}-${String(currentY).slice(2)}`;
+  const isCurrentSession =
+    !selectedSession || selectedSession === currentSession;
   const result: string[] = [];
-  if (currentMonthIdx >= 3) {
-    for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+  if (isCurrentSession) {
+    if (currentMonthIdx >= 3) {
+      for (let i = 3; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    } else {
+      for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
+      for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    }
   } else {
     for (let i = 3; i <= 11; i++) result.push(MONTHS[i]);
-    for (let i = 0; i <= currentMonthIdx; i++) result.push(MONTHS[i]);
+    for (let i = 0; i <= 2; i++) result.push(MONTHS[i]);
   }
   return result.reverse();
 }
@@ -248,6 +261,12 @@ const REPORT_CATEGORIES = [
         label: "Bank Statement / ECS",
         icon: <Banknote className="w-4 h-4" />,
         desc: "Bank transfer list for net salary credit",
+      },
+      {
+        id: "consolidated-register",
+        label: "Consolidated Register",
+        icon: <BookOpen className="w-4 h-4" />,
+        desc: "Summary of salary bills — institute-wise consolidated report",
       },
       {
         id: "arrears",
@@ -676,6 +695,13 @@ export default function ReportsPage() {
     let tableHTML = "";
     let tableHeader = "";
 
+    if (reportId === "consolidated-register") {
+      return buildConsolidatedRegisterHTML(
+        selectedInstitute,
+        selectedMonth,
+        String(selectedYear),
+      );
+    }
     if (reportId === "bank-statement") {
       tableHeader =
         "<tr><th>Employee Name</th><th>Emp ID</th><th>Account No</th><th>Bank</th><th>IFSC</th><th>Net Amount</th></tr>";
@@ -782,6 +808,124 @@ export default function ReportsPage() {
   Generated on ${formatToday()} | &#169; 2026 Yf's Platform \u2014 Salary Management System
 </div>
 </body></html>`;
+  }
+
+  // ─── CONSOLIDATED REGISTER ──────────────────────────────────────────────────
+  function buildConsolidatedRegisterHTML(
+    institute: string,
+    month: string,
+    year: string,
+  ): string {
+    const allEmps = getEmployees().filter(
+      (e) => institute === "all" || e.institute === institute,
+    );
+    const allSals = getSalaries();
+    const instList: string[] =
+      institute === "all"
+        ? ([
+            ...new Set(allEmps.map((e) => e.institute).filter(Boolean)),
+          ] as string[])
+        : [institute];
+    const cols = [
+      "Basic Pay",
+      "Special Pay",
+      "DA",
+      "DA Arrear",
+      "HRA",
+      "Bonus",
+      "Conveyance",
+      "Washing",
+      "LTC",
+      "Festival Adv",
+      "Incentive",
+      "Other Earn",
+      "Gross",
+      "House Rent",
+      "Electricity",
+      "LWF",
+      "EPF",
+      "VPF",
+      "LIC",
+      "Prof. Tax",
+      "Income Tax",
+      "Festival Rec.",
+      "ESIC",
+      "Security",
+      "Other Ded.",
+      "Total Ded.",
+      "Net Payable",
+    ];
+    let rows = "";
+    let totals: Record<string, number> = {};
+    for (const col of cols) totals[col] = 0;
+    let sl = 1;
+    for (const inst of instList) {
+      const emps = allEmps.filter((e) => e.institute === inst);
+      const sals = allSals.filter((s: any) => {
+        const emp = emps.find(
+          (e) =>
+            String(e.id) === String(s.employeeId) ||
+            e.employeeId === s.employeeId,
+        );
+        return (
+          !!emp &&
+          (s.month === month ||
+            s.month === String(MONTHS.indexOf(month) + 1)) &&
+          String(s.year) === year
+        );
+      });
+      const sum = (key: string) =>
+        sals.reduce((a: number, s: any) => a + (Number(s[key]) || 0), 0);
+      const r = {
+        "Basic Pay": sum("basicPay") || sum("basic"),
+        "Special Pay": sum("specialPay"),
+        DA: sum("da"),
+        "DA Arrear": sum("daArrears"),
+        HRA: sum("hra"),
+        Bonus: sum("bonus"),
+        Conveyance: sum("conveyanceAllowance"),
+        Washing: sum("washingAllowance"),
+        LTC: sum("ltc"),
+        "Festival Adv": sum("festivalAdvance"),
+        Incentive: sum("incentive"),
+        "Other Earn": sum("otherEarnings"),
+        Gross: sum("grossEarnings") || sum("gross"),
+        "House Rent": sum("houseRent"),
+        Electricity: sum("electricityCharges"),
+        LWF: sum("lwf"),
+        EPF: sum("epf") || sum("pf"),
+        VPF: sum("vpf"),
+        LIC: sum("lic"),
+        "Prof. Tax": sum("profTax") || sum("pt"),
+        "Income Tax": sum("incomeTax") || sum("it"),
+        "Festival Rec.": sum("festival"),
+        ESIC: sum("esi") || sum("esic"),
+        Security: sum("security"),
+        "Other Ded.": sum("otherDeductions"),
+        "Total Ded.": sum("totalDeductions"),
+        "Net Payable": sum("netEarnings") || sum("net"),
+      };
+      for (const col of cols)
+        totals[col] = (totals[col] || 0) + (r[col as keyof typeof r] || 0);
+      const fmtN = (n: number) => (n ? n.toLocaleString("en-IN") : "-");
+      rows += `<tr><td>${sl++}</td><td>${inst}</td>${cols.map((c) => `<td class="num">${fmtN(r[c as keyof typeof r] || 0)}</td>`).join("")}</tr>`;
+    }
+    const tRow = `<tr class="total-row"><td colspan="2"><strong>Grand Total</strong></td>${cols.map((c) => `<td class="num"><strong>${(totals[c] || 0).toLocaleString("en-IN")}</strong></td>`).join("")}</tr>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Consolidated Register</title>
+    <style>body{font-family:Arial,sans-serif;font-size:10px;margin:20px} h2,h3{text-align:center;margin:4px 0} table{width:100%;border-collapse:collapse;margin-top:12px} th,td{border:1px solid #999;padding:3px 5px;white-space:nowrap} th{background:#e8e8e8;font-size:9px} .num{text-align:right} .total-row{background:#fff3cd;font-weight:bold} @media print{.no-print{display:none}}</style>
+    </head><body>
+    <h2>${institute === "all" ? "All Institutes" : institute}</h2>
+    <h3>Summary of Salary Bills — ${month} ${year}</h3>
+    <div style="overflow-x:auto"><table>
+    <thead><tr><th>Sl</th><th>Institution</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>
+    <tbody>${rows}${tRow}</tbody></table></div>
+    <div style="margin-top:20px;display:flex;gap:40px;justify-content:flex-end;font-size:11px">
+      <span>Prepared by (Acct. Asst.): _______________</span>
+      <span>Checked by (S.O.): _______________</span>
+      <span>Secretary: _______________</span>
+      <span>Treasurer: _______________</span>
+    </div>
+    </body></html>`;
   }
 
   // ─── SALARY REGISTER (Annual per-employee format) ───────────────────────────
@@ -1337,8 +1481,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
       )
       .join("");
 
-    const orgName =
-      institute === "all" ? "Yf's Platform — Salary Management" : institute;
+    const orgName = institute === "all" ? "All Institutes" : institute;
     const monthYear = `${month.substring(0, 3)}-${year.slice(2)}`;
 
     // Amount in words (basic)
@@ -1875,7 +2018,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
-              {getSessionMonthNames().map((m) => (
+              {getSessionMonthNames(selectedSessionYear).map((m) => (
                 <SelectItem key={m} value={m}>
                   {m}
                 </SelectItem>

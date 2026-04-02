@@ -166,23 +166,43 @@ const MONTHS_FULL = [
   "December",
 ];
 
-function getMonthList(): { label: string; month: number; year: number }[] {
+function getMonthList(
+  selectedSession?: string,
+): { label: string; month: number; year: number }[] {
   const list: { label: string; month: number; year: number }[] = [];
   const now = new Date();
   const curMonth = now.getMonth() + 1;
   const curYear = now.getFullYear();
-  // Session: Apr of sessionStart to current month
-  // Determine session start year: if current month < 4, session started previous year
-  const sessionStartYear = curMonth >= 4 ? curYear : curYear - 1;
-  let y = curYear;
-  let m = curMonth;
-  while (y > sessionStartYear || (y === sessionStartYear && m >= 4)) {
-    list.push({ label: MONTHS_FULL[m - 1], month: m, year: y });
-    m--;
-    if (m === 0) {
-      m = 12;
-      y--;
+  const currentSession =
+    curMonth >= 4
+      ? `${curYear}-${String(curYear + 1).slice(2)}`
+      : `${curYear - 1}-${String(curYear).slice(2)}`;
+  const isCurrentSession =
+    !selectedSession || selectedSession === currentSession;
+
+  if (isCurrentSession) {
+    const sessionStartYear = curMonth >= 4 ? curYear : curYear - 1;
+    let y = curYear;
+    let m = curMonth;
+    while (y > sessionStartYear || (y === sessionStartYear && m >= 4)) {
+      list.push({ label: MONTHS_FULL[m - 1], month: m, year: y });
+      m--;
+      if (m === 0) {
+        m = 12;
+        y--;
+      }
     }
+  } else {
+    const startYear = Number.parseInt(
+      (selectedSession || currentSession).split("-")[0],
+      10,
+    );
+    // Apr-Dec of startYear
+    for (let m = 12; m >= 4; m--)
+      list.push({ label: MONTHS_FULL[m - 1], month: m, year: startYear });
+    // Jan-Mar of startYear+1
+    for (let m = 3; m >= 1; m--)
+      list.push({ label: MONTHS_FULL[m - 1], month: m, year: startYear + 1 });
   }
   return list;
 }
@@ -250,7 +270,7 @@ export default function ContractWorkersPage() {
   const [transferTo, setTransferTo] = useState("");
 
   const institutes = getInstitutes();
-  const monthList = getMonthList();
+  const monthList = getMonthList(selectedSession);
 
   const selMonthObj =
     monthList.find((m) => m.label === selectedMonthLabel) ?? monthList[0];

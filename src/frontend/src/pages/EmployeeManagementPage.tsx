@@ -73,6 +73,7 @@ import {
   EmploymentType,
   type Institute,
   useAddEmployee,
+  useDeleteAllEmployees,
   useDeleteEmployee,
   useGetAllEmployees,
   useGetAllInstitutes,
@@ -277,28 +278,6 @@ const COUNTRY_CODES: string[] = [
   "+33",
 ];
 
-function formatDateDisplay(dateStr: string): string {
-  if (!dateStr) return "";
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${day}-${months[d.getMonth()]},${d.getFullYear()}`;
-}
-
 function mapDesignationToEnum(d: string): Designation {
   const academic = [
     "Principal",
@@ -498,7 +477,7 @@ interface EmpForm {
     | "inactive"
     | "resigned"
     | "retired"
-    | "relived"
+    | "relieved"
     | "";
   countryCode: string;
   phone: string;
@@ -567,6 +546,8 @@ export default function EmployeeManagementPage() {
   const { data: institutes = [], isLoading: loadingInstitutes } =
     useGetAllInstitutes();
   const [selectedInstId, setSelectedInstId] = useState<string>("all");
+  const [selectedEmployeeFilter, setSelectedEmployeeFilter] =
+    useState<string>("all");
   const { data: allEmployees = [], isLoading: loadingEmps } =
     useGetAllEmployees();
   const employees =
@@ -577,6 +558,8 @@ export default function EmployeeManagementPage() {
   const addMutation = useAddEmployee();
   const updateMutation = useUpdateEmployee();
   const deleteMutation = useDeleteEmployee();
+  const deleteAllMutation = useDeleteAllEmployees();
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -935,27 +918,51 @@ export default function EmployeeManagementPage() {
                 joiningDate || new Date().toISOString().split("T")[0],
               address: address || "-",
               dob: dob || "2000-01-01",
-              basicSalary: BigInt(0),
+              basicSalary: BigInt(
+                Math.round(
+                  Number(row.basicPay || row.basicSalary || row.basic || 0) ||
+                    0,
+                ),
+              ),
             });
             // Save extra fields
             saveEmpExtra(staffno, {
               designation: normalizedDesig || "",
-              department,
-              gender,
-              religion,
-              panNo: pan,
-              pfNumber: pfNo,
-              esiNumber: esicNo,
-              aadhaarNo: aadhaar,
-              uanNo: uan,
-              phone,
-              emailId: email,
-              bankName,
-              bankBranch,
-              bankAccountNo,
-              licNos,
+              department: department || String(row.dept || "").trim(),
+              gender: gender || String(row.gender || "").trim(),
+              religion: religion || String(row.religion || "").trim(),
+              category: String(row.category || "").trim(),
+              fatherName: String(row.fatherName || row.father || "").trim(),
+              panNo: pan || String(row.pan || row.panNo || "").trim(),
+              pfNumber: pfNo || String(row.pf || row.pfNo || "").trim(),
+              esiNumber: esicNo || String(row.esi || row.esicNo || "").trim(),
+              aadhaarNo:
+                aadhaar || String(row.aadhaar || row.aadhaarNo || "").trim(),
+              uanNo: uan || String(row.uan || row.uanNo || "").trim(),
+              phone: phone || String(row.phone || row.mobile || "").trim(),
+              emailId: email || String(row.email || "").trim(),
+              bankName: bankName || String(row.bankName || "").trim(),
+              bankBranch: bankBranch || String(row.bankBranch || "").trim(),
+              bankAccountNo:
+                bankAccountNo ||
+                String(row.accountNo || row.bankAccountNo || "").trim(),
+              ifscCode: String(row.ifsc || row.ifscCode || "").trim(),
+              licNos: licNos.length
+                ? licNos
+                : String(row.lic || row.licNos || "").trim()
+                  ? String(row.lic || row.licNos || "")
+                      .split(";")
+                      .map((l: string) => l.trim())
+                      .filter(Boolean)
+                  : [],
               address,
               employeeType: employmentType,
+              employeeStatus:
+                String(row.status || row.employeeStatus || "active")
+                  .trim()
+                  .toLowerCase() || "active",
+              ta: Number(row.ta || 0) || 0,
+              vpfValue: Number(row.vpf || 0) || 0,
               institute: matchedInstitute?.name || "",
             });
             // Auto-generate credentials
@@ -1125,7 +1132,7 @@ export default function EmployeeManagementPage() {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
-      toast.success("Employee deleted");
+      toast.error("Employee deleted");
       setDeleteTarget(null);
     } catch {
       toast.error("Delete failed");
@@ -1201,6 +1208,83 @@ export default function EmployeeManagementPage() {
           </Button>
           <Button
             variant="outline"
+            className="gap-2 border-green-500/40 text-green-500 hover:bg-green-500/10"
+            onClick={() => {
+              // Build CSV from filtered employees
+              const headers = [
+                "staffno",
+                "name",
+                "fatherName",
+                "dob",
+                "gender",
+                "religion",
+                "category",
+                "designation",
+                "department",
+                "employeeType",
+                "status",
+                "joiningDate",
+                "address",
+                "phone",
+                "email",
+                "bankName",
+                "bankBranch",
+                "accountNo",
+                "ifsc",
+                "licNos",
+                "basicSalary",
+                "ta",
+                "vpf",
+                "institute",
+              ];
+              const rows = employees.map((emp: any) => {
+                const ex = getEmpExtra(emp.employeeId);
+                return [
+                  emp.employeeId,
+                  emp.name,
+                  ex.fatherName || "",
+                  emp.dob || "",
+                  ex.gender || "",
+                  ex.religion || "",
+                  ex.category || "",
+                  ex.designation || emp.designation || "",
+                  ex.department || "",
+                  String(emp.employmentType),
+                  ex.employeeStatus || "active",
+                  emp.joiningDate || "",
+                  (emp.address || "").replace(/,/g, ";"),
+                  ex.phone || "",
+                  ex.emailId || "",
+                  ex.bankName || "",
+                  ex.bankBranch || "",
+                  ex.bankAccountNo || "",
+                  ex.ifscCode || "",
+                  Array.isArray(ex.licNos)
+                    ? ex.licNos.join(";")
+                    : ex.licNo || "",
+                  Number(emp.basicSalary) || 0,
+                  ex.ta || 0,
+                  ex.vpfValue || 0,
+                  ex.institute || "",
+                ]
+                  .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+                  .join(",");
+              });
+              const csv = [headers.join(","), ...rows].join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            data-ocid="employees.download_button"
+          >
+            <Download className="w-4 h-4" /> Download Employees
+          </Button>
+          <Button
+            variant="outline"
             className="gap-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => xlsxFileRef.current?.click()}
             disabled={institutes.length === 0 && !loadingInstitutes}
@@ -1216,6 +1300,16 @@ export default function EmployeeManagementPage() {
           >
             <Plus className="w-4 h-4" /> Add Employee
           </Button>
+          {employees.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteAllDialog(true)}
+              className="gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> Delete All
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -1248,7 +1342,10 @@ export default function EmployeeManagementPage() {
         <div className="flex items-center gap-2 w-full sm:w-60">
           <Select
             value={selectedInstId}
-            onValueChange={(v) => setSelectedInstId(v)}
+            onValueChange={(v) => {
+              setSelectedInstId(v);
+              setSelectedEmployeeFilter("all");
+            }}
           >
             <SelectTrigger
               className="bg-card/60 border-border/60"
@@ -1263,6 +1360,33 @@ export default function EmployeeManagementPage() {
                   {i.name}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-60">
+          <Select
+            value={selectedEmployeeFilter}
+            onValueChange={(v) => setSelectedEmployeeFilter(v)}
+          >
+            <SelectTrigger
+              className="bg-card/60 border-border/60"
+              data-ocid="employees.employee.select"
+            >
+              <SelectValue placeholder="All Employees" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72 overflow-y-auto">
+              <SelectItem value="all">All Employees</SelectItem>
+              {employees
+                .filter(
+                  (emp) =>
+                    selectedInstId === "all" ||
+                    emp.instituteId.toString() === selectedInstId,
+                )
+                .map((emp) => (
+                  <SelectItem key={emp.employeeId} value={emp.employeeId}>
+                    {emp.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
@@ -1343,18 +1467,47 @@ export default function EmployeeManagementPage() {
                           )}
                         </div>
                       </div>
-                      <Badge
-                        className={`text-xs flex-shrink-0 ${
-                          emp.employmentType === EmploymentType.regular
-                            ? "bg-success/20 text-success border-success/30"
-                            : "bg-warning/20 text-warning border-warning/30"
-                        }`}
-                        variant="outline"
-                      >
-                        {emp.employmentType === EmploymentType.regular
-                          ? "Regular"
-                          : "Temporary"}
-                      </Badge>
+                      <div className="flex flex-col gap-1 items-end">
+                        <Badge
+                          className={`text-xs flex-shrink-0 ${
+                            emp.employmentType === EmploymentType.regular
+                              ? "bg-success/20 text-success border-success/30"
+                              : "bg-warning/20 text-warning border-warning/30"
+                          }`}
+                          variant="outline"
+                        >
+                          {emp.employmentType === EmploymentType.regular
+                            ? "Regular"
+                            : "Temporary"}
+                        </Badge>
+                        {extra.employeeStatus &&
+                          extra.employeeStatus !== "active" && (
+                            <Badge
+                              className={`text-xs flex-shrink-0 ${
+                                extra.employeeStatus === "retired"
+                                  ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                  : extra.employeeStatus === "relieved"
+                                    ? "bg-red-500/20 text-red-400 border-red-500/30"
+                                    : "bg-muted/50 text-muted-foreground"
+                              }`}
+                              variant="outline"
+                            >
+                              {(extra.employeeStatus as string)
+                                .charAt(0)
+                                .toUpperCase() +
+                                (extra.employeeStatus as string).slice(1)}
+                            </Badge>
+                          )}
+                        {(!extra.employeeStatus ||
+                          extra.employeeStatus === "active") && (
+                          <Badge
+                            className="text-xs flex-shrink-0 bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                            variant="outline"
+                          >
+                            Active
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 mt-4 text-xs text-muted-foreground">
@@ -1626,22 +1779,13 @@ export default function EmployeeManagementPage() {
                       <Calendar className="w-3 h-3" />
                       Date of Birth
                     </Label>
-                    <div className="relative">
-                      <Input
-                        readOnly
-                        placeholder="DD-Mmm,YYYY"
-                        value={form.dob ? formatDateDisplay(form.dob) : ""}
-                        className={`${inputCls} cursor-pointer`}
-                        data-ocid="employees.dob.input"
-                      />
-                      <input
-                        type="date"
-                        value={form.dob || ""}
-                        onChange={(e) => setField("dob", e.target.value)}
-                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                        tabIndex={-1}
-                      />
-                    </div>
+                    <input
+                      type="date"
+                      value={form.dob || ""}
+                      onChange={(e) => setField("dob", e.target.value)}
+                      data-ocid="employees.dob.input"
+                      className="w-full h-9 px-3 rounded-md border border-border/60 bg-input/60 text-foreground text-sm cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Religion</Label>
@@ -1754,7 +1898,7 @@ export default function EmployeeManagementPage() {
                         <SelectItem value="inactive">Inactive</SelectItem>
                         <SelectItem value="resigned">Resigned</SelectItem>
                         <SelectItem value="retired">Retired</SelectItem>
-                        <SelectItem value="relived">Relived</SelectItem>
+                        <SelectItem value="relieved">Relived</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1806,28 +1950,13 @@ export default function EmployeeManagementPage() {
                       <Calendar className="w-3 h-3" />
                       Joining Date
                     </Label>
-                    <div className="relative">
-                      <Input
-                        readOnly
-                        placeholder="DD-Mmm,YYYY"
-                        value={
-                          form.joiningDate
-                            ? formatDateDisplay(form.joiningDate)
-                            : ""
-                        }
-                        className={`${inputCls} cursor-pointer`}
-                        data-ocid="employees.joiningdate.input"
-                      />
-                      <input
-                        type="date"
-                        value={form.joiningDate || ""}
-                        onChange={(e) =>
-                          setField("joiningDate", e.target.value)
-                        }
-                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                        tabIndex={-1}
-                      />
-                    </div>
+                    <input
+                      type="date"
+                      value={form.joiningDate || ""}
+                      onChange={(e) => setField("joiningDate", e.target.value)}
+                      data-ocid="employees.joiningdate.input"
+                      className="w-full h-9 px-3 rounded-md border border-border/60 bg-input/60 text-foreground text-sm cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    />
                   </div>
                 </div>
 
@@ -2124,6 +2253,49 @@ export default function EmployeeManagementPage() {
                 </>
               ) : (
                 "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Employees Dialog */}
+      <AlertDialog
+        open={showDeleteAllDialog}
+        onOpenChange={setShowDeleteAllDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader data-ocid="employees.delete_all_dialog">
+            <AlertDialogTitle className="font-display text-destructive">
+              Delete All Employees?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <strong>all {employees.length} employees</strong>. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await deleteAllMutation.mutateAsync();
+                  toast.error("All employees deleted");
+                  setShowDeleteAllDialog(false);
+                } catch {
+                  toast.error("Failed to delete employees");
+                }
+              }}
+            >
+              {deleteAllMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete All"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

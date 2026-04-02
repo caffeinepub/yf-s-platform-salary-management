@@ -8,6 +8,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,6 +32,7 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { getCurrentSession, getSessionList } from "../utils/sessionUtils";
 
 const _MONTHS = [
   "January",
@@ -265,6 +273,75 @@ export default function EmployeeSalarySlipsPage() {
 
   const [viewSalary, setViewSalary] = useState<any | null>(null);
 
+  const sessionList = getSessionList();
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentSession = getCurrentSession();
+
+  // Get list of available sessions from salary records (DOJ year to current)
+  const availableSessions = (() => {
+    const sessSet = new Set<string>();
+    sessSet.add(currentSession);
+    for (const s of empSalaries) {
+      const yr = Number(s.year);
+      const mo = Number(s.month);
+      if (mo >= 4) sessSet.add(`${yr}-${String(yr + 1).slice(2)}`);
+      else sessSet.add(`${yr - 1}-${String(yr).slice(2)}`);
+    }
+    return sessionList.filter((s) => sessSet.has(s));
+  })();
+
+  const [filterSession, setFilterSession] = useState(currentSession);
+  const [filterMonth, setFilterMonth] = useState(currentMonth);
+
+  // Get available months for selected session
+  const sessionMonths = (() => {
+    const months: { value: number; label: string }[] = [];
+    const MONTH_LABELS = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const isCurrentSess = filterSession === currentSession;
+    if (isCurrentSess) {
+      if (currentMonth >= 4) {
+        for (let m = currentMonth; m >= 4; m--)
+          months.push({ value: m, label: MONTH_LABELS[m - 1] });
+      } else {
+        for (let m = currentMonth; m >= 1; m--)
+          months.push({ value: m, label: MONTH_LABELS[m - 1] });
+        for (let m = 12; m >= 4; m--)
+          months.push({ value: m, label: MONTH_LABELS[m - 1] });
+      }
+    } else {
+      for (let m = 3; m >= 1; m--)
+        months.push({ value: m, label: MONTH_LABELS[m - 1] });
+      for (let m = 12; m >= 4; m--)
+        months.push({ value: m, label: MONTH_LABELS[m - 1] });
+    }
+    return months;
+  })();
+
+  // Filter salaries by selected session/month
+  const filteredSalaries = empSalaries.filter((s: any) => {
+    const yr = Number(s.year);
+    const mo = Number(s.month);
+    const sessMo =
+      mo >= 4
+        ? `${yr}-${String(yr + 1).slice(2)}`
+        : `${yr - 1}-${String(yr).slice(2)}`;
+    return sessMo === filterSession && mo === filterMonth;
+  });
+
   const handlePrint = () => {
     const content = document.getElementById("payslip-print");
     if (!content) return;
@@ -283,17 +360,58 @@ export default function EmployeeSalarySlipsPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <h1 className="text-2xl font-display font-bold text-gradient">
-          My Salary Slips
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          View and download your salary records
-        </p>
+        <div>
+          <h1 className="text-2xl font-display font-bold text-gradient">
+            My Salary Slips
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            View and download your salary records
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={filterMonth.toString()}
+            onValueChange={(v) => setFilterMonth(Number(v))}
+          >
+            <SelectTrigger className="w-28 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {sessionMonths.map((m) => (
+                <SelectItem key={m.value} value={m.value.toString()}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filterSession}
+            onValueChange={(newSess) => {
+              setFilterSession(newSess);
+              // Set latest month for session
+              const isCurrentSess = newSess === currentSession;
+              if (isCurrentSess) setFilterMonth(currentMonth);
+              else setFilterMonth(3);
+            }}
+          >
+            <SelectTrigger className="w-28 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-[250px] overflow-y-auto">
+              {availableSessions.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </motion.div>
 
       {/* Table */}
-      {empSalaries.length === 0 ? (
+      {filteredSalaries.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -329,7 +447,7 @@ export default function EmployeeSalarySlipsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {empSalaries.map((sal: any, idx: number) => (
+                  {filteredSalaries.map((sal: any, idx: number) => (
                     <TableRow
                       key={`${sal.month}-${sal.year}`}
                       data-ocid={`salary_slips.item.${idx + 1}`}

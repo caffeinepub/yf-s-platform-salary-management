@@ -136,12 +136,12 @@ function generatePeriods(
     const start2 = `${year}-${String(m + 1).padStart(2, "0")}-16`;
     const end2 = `${year}-${String(m + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
     periods.push({
-      label: `${monthNames[m]} 1-15`,
+      label: `1-15 ${monthNames[m]}`,
       start: start1,
       end: end1,
     });
     periods.push({
-      label: `${monthNames[m]} 16-${daysInMonth}`,
+      label: `16-${daysInMonth} ${monthNames[m]}`,
       start: start2,
       end: end2,
     });

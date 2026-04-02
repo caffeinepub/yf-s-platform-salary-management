@@ -126,7 +126,7 @@ function getEmployeeCredentials(): Array<{
 
 function getEmployees(): Array<{ name: string; employeeId: string }> {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
@@ -140,6 +140,17 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Push state so that pressing back doesn't navigate away
+    window.history.pushState({ page: "login" }, "", window.location.href);
+    const handler = (_e: PopStateEvent) => {
+      // Re-push state to stay on login, or attempt close
+      window.history.pushState({ page: "login" }, "", window.location.href);
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

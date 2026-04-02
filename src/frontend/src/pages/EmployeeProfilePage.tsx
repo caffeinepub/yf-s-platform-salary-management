@@ -175,30 +175,7 @@ export default function EmployeeProfilePage() {
           >
             <Pencil className="w-4 h-4" /> Edit Profile
           </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setEditing(false)}
-              data-ocid="emp_profile.cancel_button"
-            >
-              <X className="w-4 h-4 mr-1" /> Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="gradient-primary text-white border-0 gap-2"
-              data-ocid="emp_profile.save_button"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        )}
+        ) : null}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -307,14 +284,44 @@ export default function EmployeeProfilePage() {
                       <Phone className="w-3 h-3" />
                       Phone
                     </Label>
-                    <Input
-                      value={form.phone}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, phone: e.target.value }))
-                      }
-                      className={inputCls}
-                      data-ocid="emp_profile.phone.input"
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={(form as any).countryCode || "+91"}
+                        onChange={(e) =>
+                          setForm((f: any) => ({
+                            ...f,
+                            countryCode: e.target.value,
+                          }))
+                        }
+                        className="h-10 px-2 rounded-md border border-border/60 bg-input/60 text-sm text-foreground w-20 flex-shrink-0"
+                      >
+                        {[
+                          "+91",
+                          "+1",
+                          "+44",
+                          "+61",
+                          "+971",
+                          "+65",
+                          "+60",
+                          "+49",
+                          "+33",
+                          "+81",
+                        ].map((cc) => (
+                          <option key={cc} value={cc}>
+                            {cc}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        value={form.phone}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, phone: e.target.value }))
+                        }
+                        className={inputCls}
+                        placeholder="Phone number"
+                        data-ocid="emp_profile.phone.input"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Email ID</Label>
@@ -422,6 +429,36 @@ export default function EmployeeProfilePage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Edit mode bottom buttons */}
+      {editing && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex gap-3 justify-end pt-2"
+        >
+          <Button
+            variant="ghost"
+            onClick={() => setEditing(false)}
+            data-ocid="emp_profile.cancel_button"
+          >
+            <X className="w-4 h-4 mr-1" /> Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="gradient-primary text-white border-0 gap-2"
+            data-ocid="emp_profile.save_button"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+        </motion.div>
+      )}
 
       {/* Official / Banking Details (read-only) */}
       <motion.div

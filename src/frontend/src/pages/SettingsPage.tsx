@@ -74,7 +74,7 @@ const DEFAULT_SALARY_CONFIG: SalaryConfig = {
 
 function getEmployees() {
   try {
-    return JSON.parse(localStorage.getItem("employees") || "[]");
+    return JSON.parse(localStorage.getItem("sms_employees") || "[]");
   } catch {
     return [];
   }
@@ -112,8 +112,32 @@ function buildCredential(emp: {
 // ─── Section: User & Password Management ─────────────────────────────────────
 function UserPasswordSection() {
   const [open, setOpen] = useState(false);
-  const employees = getEmployees();
-  const credentials: EmployeeCredential[] = employees.map(buildCredential);
+  const [filterInstitute, setFilterInstitute] = useState("all");
+  const [filterEmployee, setFilterEmployee] = useState("all");
+  const allEmployees = getEmployees();
+  const institutes: any[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("sms_institutes") || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const filteredByInstitute =
+    filterInstitute === "all"
+      ? allEmployees
+      : allEmployees.filter(
+          (e: any) =>
+            e.institute === filterInstitute ||
+            (e.instituteId && String(e.instituteId) === filterInstitute),
+        );
+  const filteredEmployees =
+    filterEmployee === "all"
+      ? filteredByInstitute
+      : filteredByInstitute.filter(
+          (e: any) => (e.employeeId || e.id) === filterEmployee,
+        );
+  const credentials: EmployeeCredential[] =
+    filteredEmployees.map(buildCredential);
 
   const [editTarget, setEditTarget] = useState<EmployeeCredential | null>(null);
   const [editUsername, setEditUsername] = useState("");
@@ -146,7 +170,7 @@ function UserPasswordSection() {
       }
       return e;
     });
-    localStorage.setItem("employees", JSON.stringify(updated));
+    localStorage.setItem("sms_employees", JSON.stringify(updated));
     toast.success("Credentials updated.");
     setEditTarget(null);
   }
@@ -157,7 +181,7 @@ function UserPasswordSection() {
       (e: { id: string; employeeId: string }) =>
         (e.employeeId || e.id) !== empId,
     );
-    localStorage.setItem("employees", JSON.stringify(updated));
+    localStorage.setItem("sms_employees", JSON.stringify(updated));
     toast.success("Employee removed.");
   }
 
@@ -304,6 +328,37 @@ function UserPasswordSection() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Institute & Employee Filters */}
+          <div className="flex gap-2 flex-wrap">
+            <select
+              value={filterInstitute}
+              onChange={(e) => {
+                setFilterInstitute(e.target.value);
+                setFilterEmployee("all");
+              }}
+              className="h-8 text-xs px-2 rounded-md border border-border/60 bg-card/60"
+            >
+              <option value="all">All Institutes</option>
+              {institutes.map((i: any) => (
+                <option key={i.id} value={i.name}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterEmployee}
+              onChange={(e) => setFilterEmployee(e.target.value)}
+              className="h-8 text-xs px-2 rounded-md border border-border/60 bg-card/60"
+            >
+              <option value="all">All Employees</option>
+              {filteredByInstitute.map((e: any) => (
+                <option key={e.employeeId || e.id} value={e.employeeId || e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Employee Credentials Table */}
@@ -461,12 +516,39 @@ function getLWFConfig(): LWFConfig {
 function SalaryConfigSection() {
   const [open, setOpen] = useState(false);
   const [config, setConfig] = useState<SalaryConfig>(getSalaryConfig);
+  const [lwfConfig, setLwfConfig] = useState<LWFConfig>(getLWFConfig);
 
   function save() {
     localStorage.setItem("sms_salary_config", JSON.stringify(config));
     syncKeyToBackend("sms_salary_config", JSON.stringify(config));
+    localStorage.setItem("sms_lwf_config", JSON.stringify(lwfConfig));
+    syncKeyToBackend("sms_lwf_config", JSON.stringify(lwfConfig));
     toast.success("Salary configuration saved.");
     setOpen(false);
+  }
+
+  // Apr-Mar month order for LWF
+  const APR_MAR_MONTHS = [
+    { name: "Apr", num: 4 },
+    { name: "May", num: 5 },
+    { name: "Jun", num: 6 },
+    { name: "Jul", num: 7 },
+    { name: "Aug", num: 8 },
+    { name: "Sep", num: 9 },
+    { name: "Oct", num: 10 },
+    { name: "Nov", num: 11 },
+    { name: "Dec", num: 12 },
+    { name: "Jan", num: 1 },
+    { name: "Feb", num: 2 },
+    { name: "Mar", num: 3 },
+  ];
+  function toggleLwfMonth(m: number) {
+    setLwfConfig((prev) => ({
+      ...prev,
+      months: prev.months.includes(m)
+        ? prev.months.filter((x) => x !== m)
+        : [...prev.months, m],
+    }));
   }
 
   function field(label: string, key: keyof SalaryConfig, unit: string) {
@@ -538,6 +620,45 @@ function SalaryConfigSection() {
             {field("PF Percentage", "pf", "%")}
             {field("ESIC Percentage", "esic", "%")}
           </div>
+          <div className="border-t border-border/40 pt-4 space-y-3">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-accent" /> LWF Configuration
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">LWF Amount (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={lwfConfig.amount}
+                onChange={(e) =>
+                  setLwfConfig((prev) => ({
+                    ...prev,
+                    amount: Number(e.target.value),
+                  }))
+                }
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Applicable Months (Apr – Mar)</Label>
+              <div className="grid grid-cols-6 gap-1.5">
+                {APR_MAR_MONTHS.map(({ name, num }) => (
+                  <label
+                    key={num}
+                    className="flex items-center gap-1 cursor-pointer text-xs"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={lwfConfig.months.includes(num)}
+                      onChange={() => toggleLwfMonth(num)}
+                      className="rounded"
+                    />
+                    {name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -550,148 +671,6 @@ function SalaryConfigSection() {
               className="gradient-primary"
               onClick={save}
               data-ocid="settings.salary_config.save_button"
-            >
-              Save Configuration
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-// ─── Section: LWF Configuration ─────────────────────────────────────────────
-function LWFConfigSection() {
-  const [open, setOpen] = useState(false);
-  const [config, setConfig] = useState<LWFConfig>(getLWFConfig);
-
-  function save() {
-    localStorage.setItem("sms_lwf_config", JSON.stringify(config));
-    syncKeyToBackend("sms_lwf_config", JSON.stringify(config));
-    toast.success("LWF configuration saved.");
-    setOpen(false);
-  }
-
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  function toggleMonth(m: number) {
-    setConfig((prev) => ({
-      ...prev,
-      months: prev.months.includes(m)
-        ? prev.months.filter((x) => x !== m)
-        : [...prev.months, m],
-    }));
-  }
-
-  return (
-    <>
-      <Card
-        className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200"
-        onClick={() => setOpen(true)}
-        data-ocid="settings.lwf_config.open_modal_button"
-      >
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent-foreground">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <CardTitle className="text-sm font-display">
-                LWF Configuration
-              </CardTitle>
-            </div>
-            <Badge
-              variant="secondary"
-              className="text-xs bg-blue-500/20 text-blue-400"
-            >
-              Active
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <CardDescription className="text-xs">
-            Set deduction amount and applicable months
-          </CardDescription>
-        </CardContent>
-      </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent data-ocid="settings.lwf_config.dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-4 h-4" /> LWF Configuration
-            </DialogTitle>
-            <DialogDescription>
-              Labour Welfare Fund deduction. Applied automatically in selected
-              months.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label className="text-xs">LWF Amount (₹)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={config.amount}
-                onChange={(e) =>
-                  setConfig((prev) => ({
-                    ...prev,
-                    amount: Number(e.target.value),
-                  }))
-                }
-                className="text-sm"
-                data-ocid="settings.lwf_config.amount.input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Applicable Months</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {monthNames.map((name, i) => {
-                  const m = i + 1;
-                  return (
-                    <label
-                      key={m}
-                      className="flex items-center gap-1.5 cursor-pointer text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={config.months.includes(m)}
-                        onChange={() => toggleMonth(m)}
-                        data-ocid={`settings.lwf_config.month_${m}.checkbox`}
-                        className="rounded"
-                      />
-                      {name}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              data-ocid="settings.lwf_config.cancel_button"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="gradient-primary"
-              onClick={save}
-              data-ocid="settings.lwf_config.save_button"
             >
               Save Configuration
             </Button>
@@ -935,8 +914,7 @@ function TaxSlabsSection() {
             {/* PT Slabs */}
             <div>
               <p className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Info className="w-4 h-4 text-primary" /> Professional Tax —
-                Maharashtra (based on annual gross)
+                Professional Tax — Maharashtra (based on annual gross)
               </p>
               <div className="border border-border/40 rounded-xl overflow-hidden">
                 <Table>
@@ -967,8 +945,7 @@ function TaxSlabsSection() {
             {/* IT Slabs */}
             <div>
               <p className="text-sm font-semibold mb-1 flex items-center gap-2">
-                <Info className="w-4 h-4 text-accent" /> Income Tax — New Regime
-                FY 2025-26
+                Income Tax — New Regime FY 2025-26
               </p>
               <p className="text-xs text-muted-foreground mb-2">
                 Standard deduction: ₹75,000. Section 87A rebate: no tax if
@@ -1275,7 +1252,6 @@ export default function SettingsPage() {
       >
         <UserPasswordSection />
         <SalaryConfigSection />
-        <LWFConfigSection />
         <DailyWorkerRateSection />
         <ContractWorkerRateSection />
         <BackupRestoreSection />

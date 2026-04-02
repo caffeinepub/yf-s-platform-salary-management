@@ -338,13 +338,20 @@ export default function Layout({
           collapsed ? "justify-center" : ""
         }`}
       >
-        <div className="w-9 h-9 rounded-lg overflow-hidden border border-primary/30 flex-shrink-0">
+        <div className="w-9 h-9 rounded-lg overflow-hidden border border-primary/30 flex-shrink-0 bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
           <img
             src="/assets/uploads/file_0000000098e07208a686dfee13498f2c-1.png"
             alt="Logo"
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";
+              const parent = e.currentTarget.parentElement;
+              if (parent && !parent.querySelector(".logo-text")) {
+                const span = document.createElement("span");
+                span.className = "logo-text text-xs font-bold text-white";
+                span.textContent = "Yf";
+                parent.appendChild(span);
+              }
             }}
           />
         </div>
