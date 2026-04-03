@@ -36,6 +36,20 @@ const MONTH_NAMES = [
   "November",
   "December",
 ];
+const SHORT_MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function getSessionMonths(
   selectedSession?: string,
@@ -53,12 +67,12 @@ function getSessionMonths(
   if (isCurrentSession) {
     if (currentMonth >= 4) {
       for (let m = 4; m <= currentMonth; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     } else {
       for (let m = 4; m <= 12; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
       for (let m = 1; m <= currentMonth; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     }
   } else {
     for (let m = 4; m <= 12; m++)
@@ -141,7 +155,7 @@ export default function PayslipPage() {
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
                 <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
-                  {inst.name}
+                  {(inst as any).shortCode || inst.name}
                 </SelectItem>
               ))}
             </SelectContent>

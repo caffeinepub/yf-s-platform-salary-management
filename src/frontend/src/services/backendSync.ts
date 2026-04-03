@@ -31,6 +31,12 @@ const SYNC_KEYS = [
   "fees_structures",
   "fees_payments",
   "fees_categories",
+  "sms_custom_designations",
+  "sms_custom_departments",
+  "sms_audit_log",
+  "sms_lwf_config",
+  "sms_salary_config",
+  "sms_admin_password",
 ];
 
 // ─── Sync status observable ───────────────────────────────────────────────────

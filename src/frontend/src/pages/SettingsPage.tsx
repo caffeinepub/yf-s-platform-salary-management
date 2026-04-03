@@ -30,6 +30,7 @@ import {
   Banknote,
   Briefcase,
   Building2,
+  ClipboardList,
   Database,
   Download,
   Eye,
@@ -38,6 +39,7 @@ import {
   Info,
   Key,
   Pencil,
+  Plus,
   Receipt,
   Settings,
   Shield,
@@ -48,6 +50,11 @@ import {
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  type AuditEntry,
+  clearAuditLog,
+  getAuditLog,
+} from "../services/auditLog";
 import { syncKeyToBackend } from "../services/backendSync";
 
 type EmployeeCredential = {
@@ -1219,6 +1226,319 @@ function ContractWorkerRateSection() {
   );
 }
 
+// ─── Section: Employee Management Settings ───────────────────────────────────
+function EmployeeSettingsSection() {
+  const [open, setOpen] = useState(false);
+  const [designations, setDesignations] = useState<string[]>(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("sms_custom_designations") || "[]",
+      );
+    } catch {
+      return [];
+    }
+  });
+  const [departments, setDepartments] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sms_custom_departments") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [newDesig, setNewDesig] = useState("");
+  const [newDept, setNewDept] = useState("");
+
+  function saveDesig(list: string[]) {
+    setDesignations(list);
+    localStorage.setItem("sms_custom_designations", JSON.stringify(list));
+    syncKeyToBackend("sms_custom_designations", JSON.stringify(list));
+    toast.success("Designations updated.");
+  }
+  function saveDept(list: string[]) {
+    setDepartments(list);
+    localStorage.setItem("sms_custom_departments", JSON.stringify(list));
+    syncKeyToBackend("sms_custom_departments", JSON.stringify(list));
+    toast.success("Departments updated.");
+  }
+
+  return (
+    <>
+      <Card
+        className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+        onClick={() => setOpen(true)}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <CardTitle className="text-sm font-display">
+                Employee Management Settings
+              </CardTitle>
+            </div>
+            <Badge
+              variant="secondary"
+              className="text-xs bg-blue-500/20 text-blue-400"
+            >
+              Customise
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <CardDescription className="text-xs">
+            Add custom designations and departments for employee management
+          </CardDescription>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4" /> Employee Management Settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Custom Designations */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Custom Designations</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New designation name"
+                  value={newDesig}
+                  onChange={(e) => setNewDesig(e.target.value)}
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newDesig.trim()) {
+                      saveDesig([...designations, newDesig.trim()]);
+                      setNewDesig("");
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="gradient-primary h-9"
+                  onClick={() => {
+                    if (newDesig.trim()) {
+                      saveDesig([...designations, newDesig.trim()]);
+                      setNewDesig("");
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {designations.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No custom designations added yet.
+                </p>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {designations.map((d, i) => (
+                    <div
+                      key={d}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-card/40 border border-border/30"
+                    >
+                      <span className="text-sm">{d}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-red-400 hover:bg-red-500/10"
+                        onClick={() =>
+                          saveDesig(designations.filter((_, j) => j !== i))
+                        }
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Custom Departments */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Custom Departments</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New department name"
+                  value={newDept}
+                  onChange={(e) => setNewDept(e.target.value)}
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newDept.trim()) {
+                      saveDept([...departments, newDept.trim()]);
+                      setNewDept("");
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="gradient-primary h-9"
+                  onClick={() => {
+                    if (newDept.trim()) {
+                      saveDept([...departments, newDept.trim()]);
+                      setNewDept("");
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {departments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No custom departments added yet.
+                </p>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {departments.map((d, i) => (
+                    <div
+                      key={d}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-card/40 border border-border/30"
+                    >
+                      <span className="text-sm">{d}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-red-400 hover:bg-red-500/10"
+                        onClick={() =>
+                          saveDept(departments.filter((_, j) => j !== i))
+                        }
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ─── Section: Audit Log ───────────────────────────────────────────────────────
+function AuditLogSection() {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+
+  function loadEntries() {
+    setEntries(getAuditLog());
+  }
+
+  return (
+    <>
+      <Card
+        className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+        onClick={() => {
+          setOpen(true);
+          loadEntries();
+        }}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent">
+                <ClipboardList className="w-5 h-5" />
+              </div>
+              <CardTitle className="text-sm font-display">Audit Log</CardTitle>
+            </div>
+            <Badge
+              variant="secondary"
+              className="text-xs bg-orange-500/20 text-orange-400"
+            >
+              30 Days
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <CardDescription className="text-xs">
+            Track admin logins, edits, and key actions over the last 30 days
+          </CardDescription>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" /> Audit Log — Last 30 Days
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-end mb-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
+              onClick={() => {
+                clearAuditLog();
+                setEntries([]);
+                toast.success("Audit log cleared.");
+              }}
+            >
+              <Trash2 className="w-3 h-3" /> Clear Log
+            </Button>
+          </div>
+          {entries.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No audit entries yet.
+            </p>
+          ) : (
+            <div className="border border-border/40 rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Date &amp; Time</TableHead>
+                    <TableHead className="text-xs">Action</TableHead>
+                    <TableHead className="text-xs">User</TableHead>
+                    <TableHead className="text-xs">Details</TableHead>
+                    <TableHead className="text-xs">Device</TableHead>
+                    <TableHead className="text-xs">IP</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.slice(0, 200).map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="text-xs whitespace-nowrap font-mono">
+                        {new Date(e.timestamp).toLocaleString("en-IN", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {e.action}
+                      </TableCell>
+                      <TableCell className="text-xs">{e.user}</TableCell>
+                      <TableCell
+                        className="text-xs text-muted-foreground max-w-[180px] truncate"
+                        title={e.details}
+                      >
+                        {e.details || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">{e.device}</TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {e.ip}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function SettingsPage() {
   return (
     <div className="space-y-6" data-ocid="settings.page">
@@ -1254,6 +1574,8 @@ export default function SettingsPage() {
         <SalaryConfigSection />
         <DailyWorkerRateSection />
         <ContractWorkerRateSection />
+        <EmployeeSettingsSection />
+        <AuditLogSection />
         <BackupRestoreSection />
         <TaxSlabsSection />
         <SystemInfoSection />

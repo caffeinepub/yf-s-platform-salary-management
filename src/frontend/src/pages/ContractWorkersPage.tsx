@@ -151,21 +151,6 @@ function fmtDate(d: string) {
   return `${weekday}, ${day} ${month}`;
 }
 
-const MONTHS_FULL = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
 function getMonthList(
   selectedSession?: string,
 ): { label: string; month: number; year: number }[] {
@@ -185,7 +170,7 @@ function getMonthList(
     let y = curYear;
     let m = curMonth;
     while (y > sessionStartYear || (y === sessionStartYear && m >= 4)) {
-      list.push({ label: MONTHS_FULL[m - 1], month: m, year: y });
+      list.push({ label: MONTHS_SHORT[m - 1], month: m, year: y });
       m--;
       if (m === 0) {
         m = 12;
@@ -199,10 +184,10 @@ function getMonthList(
     );
     // Apr-Dec of startYear
     for (let m = 12; m >= 4; m--)
-      list.push({ label: MONTHS_FULL[m - 1], month: m, year: startYear });
+      list.push({ label: MONTHS_SHORT[m - 1], month: m, year: startYear });
     // Jan-Mar of startYear+1
     for (let m = 3; m >= 1; m--)
-      list.push({ label: MONTHS_FULL[m - 1], month: m, year: startYear + 1 });
+      list.push({ label: MONTHS_SHORT[m - 1], month: m, year: startYear + 1 });
   }
   return list;
 }
@@ -240,7 +225,7 @@ export default function ContractWorkersPage() {
   const [filterInstitute, setFilterInstitute] = useState("all");
   const [filterWorker, setFilterWorker] = useState("all");
   const [selectedMonthLabel, setSelectedMonthLabel] = useState(() => {
-    return MONTHS_FULL[now.getMonth()];
+    return MONTHS_SHORT[now.getMonth()];
   });
   const [selectedSession, setSelectedSession] = useState(() => {
     const m = now.getMonth() + 1;

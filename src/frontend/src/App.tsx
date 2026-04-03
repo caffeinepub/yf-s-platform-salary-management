@@ -34,6 +34,7 @@ import ReportsPage from "./pages/ReportsPage";
 import SalaryDetailsPage from "./pages/SalaryDetailsPage";
 import SalaryProcessingPage from "./pages/SalaryProcessingPage";
 import SettingsPage from "./pages/SettingsPage";
+import { recordAudit } from "./services/auditLog";
 import { syncFromBackend } from "./services/backendSync";
 import TallyApp from "./tally/TallyApp";
 import type { TallyPage } from "./tally/types";
@@ -368,11 +369,14 @@ function AppInner() {
   const [tallyPage, setTallyPage] = useState<TallyPage>("dashboard");
   const [feesPage, setFeesPage] = useState<FeesPage>("dashboard");
 
-  // Always reset to dashboard when user authenticates
+  // Always reset to dashboard when user authenticates + record audit log
   useEffect(() => {
     if (isAuthenticated && role === "admin") {
       setCurrentPage("dashboard");
       setAppSystem("salary");
+      recordAudit("Admin Login", "Admin", "Logged in successfully").catch(
+        () => {},
+      );
     }
   }, [isAuthenticated, role]);
   const [_historyStack, setHistoryStack] = useState<

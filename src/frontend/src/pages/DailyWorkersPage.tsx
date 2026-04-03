@@ -204,12 +204,11 @@ export default function DailyWorkersPage() {
   const [periods, setPeriods] = useState<WorkerPeriod[]>(getPeriods);
   const [filterInstitute, setFilterInstitute] = useState("all");
   const [filterWorker, setFilterWorker] = useState("all");
-  const [filterPeriod, setFilterPeriod] = useState("");
+  const [selectedSession, setSelectedSession] = useState(getCurrentSession());
+  const sessionList = getSessionList();
   const [dailyWorkerRate] = useState(() =>
     Number(localStorage.getItem("dailyWorkerRate") || "500"),
   );
-  const [selectedSession, setSelectedSession] = useState(getCurrentSession());
-  const sessionList = getSessionList();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editWorker, setEditWorker] = useState<DailyWorker | null>(null);
   const [statusWorker, setStatusWorker] = useState<{
@@ -237,12 +236,29 @@ export default function DailyWorkersPage() {
     Number.parseInt(selectedSession.split("-")[0], 10),
   );
   const yearPeriods = generatePeriods(Number(selectedYear));
-  const yearPeriodsDesc = [...yearPeriods].reverse();
+  // Only include periods whose end date has already passed (no future periods)
+  const now2 = new Date();
+  const yearPeriodsDesc = [...yearPeriods]
+    .filter((p) => new Date(p.end) <= now2)
+    .reverse();
 
-  // Set default filterPeriod to most recent on first render
-  if (!filterPeriod && yearPeriodsDesc.length > 0) {
-    setTimeout(() => setFilterPeriod(yearPeriodsDesc[0].label), 0);
+  // Compute default period: latest period that has ended
+  function getDefaultPeriod(
+    periodsDesc: { label: string; start: string; end: string }[],
+  ): string {
+    return periodsDesc.length > 0 ? periodsDesc[0].label : "";
   }
+
+  const [filterPeriod, setFilterPeriod] = useState(() =>
+    getDefaultPeriod(
+      (() => {
+        const sessYear = Number.parseInt(getCurrentSession().split("-")[0], 10);
+        const allP = generatePeriods(sessYear);
+        const n = new Date();
+        return [...allP].filter((p) => new Date(p.end) <= n).reverse();
+      })(),
+    ),
+  );
 
   const filteredWorkers = workers.filter(
     (w) => filterInstitute === "all" || w.institute === filterInstitute,

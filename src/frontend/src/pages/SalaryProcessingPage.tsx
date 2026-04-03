@@ -858,7 +858,7 @@ export default function SalaryProcessingPage() {
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
                 <SelectItem key={inst.id} value={String(inst.id)}>
-                  {inst.name}
+                  {(inst as any).shortCode || inst.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -885,7 +885,7 @@ export default function SalaryProcessingPage() {
             <SelectContent className="max-h-[250px] overflow-y-auto">
               {getSessionMonthNames(selectedSession).map((m) => (
                 <SelectItem key={m} value={m}>
-                  {m}
+                  {m.slice(0, 3)}
                 </SelectItem>
               ))}
             </SelectContent>

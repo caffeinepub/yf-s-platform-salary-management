@@ -438,7 +438,9 @@ function getSalaries(): StoredSalary[] {
 function getInstitutes(): string[] {
   try {
     const inst = JSON.parse(localStorage.getItem("sms_institutes") || "[]");
-    return inst.map((i: { name: string }) => i.name);
+    return inst.map(
+      (i: { name: string; shortCode?: string }) => i.shortCode || i.name,
+    );
   } catch {
     return [];
   }
@@ -2020,7 +2022,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
             <SelectContent className="max-h-[250px] overflow-y-auto">
               {getSessionMonthNames(selectedSessionYear).map((m) => (
                 <SelectItem key={m} value={m}>
-                  {m}
+                  {m.slice(0, 3)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -48,6 +48,8 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  FileSpreadsheet,
+  FileText,
   FileUp,
   Filter,
   History,
@@ -248,6 +250,31 @@ const DEPARTMENTS: string[] = [
   "Security",
   "Other",
 ];
+
+// Merge custom designations/departments from settings
+function getMergedDesignations(): string[] {
+  try {
+    const custom: string[] = JSON.parse(
+      localStorage.getItem("sms_custom_designations") || "[]",
+    );
+    const merged = [...new Set([...DESIGNATIONS, ...custom])].sort();
+    return merged;
+  } catch {
+    return DESIGNATIONS;
+  }
+}
+
+function getMergedDepartments(): string[] {
+  try {
+    const custom: string[] = JSON.parse(
+      localStorage.getItem("sms_custom_departments") || "[]",
+    );
+    const merged = [...new Set([...DEPARTMENTS, ...custom])].sort();
+    return merged;
+  } catch {
+    return DEPARTMENTS;
+  }
+}
 
 const BANK_NAMES: string[] = [
   "Bank of India",
@@ -542,6 +569,41 @@ function saveEmpExtra(employeeId: string, data: any) {
   localStorage.setItem(`empExtra_${employeeId}`, JSON.stringify(data));
 }
 
+function parseDateToISO(val: string | number | undefined | null): string {
+  if (val === null || val === undefined || val === "") return "";
+  const s = String(val).trim();
+  // Handle Excel serial numbers (numeric > 40000)
+  if (/^\d+$/.test(s) && Number(s) > 40000) {
+    const d = new Date((Number(s) - 25569) * 86400 * 1000);
+    return d.toISOString().split("T")[0];
+  }
+  // Handle "dd-Mmm,YYYY" or "dd-Mmm YYYY" or "dd/mm/yyyy"
+  const match = s.match(/(\d{1,2})[-/](\w{3})[,\s]+(\d{4})/);
+  if (match) {
+    const months: Record<string, string> = {
+      Jan: "01",
+      Feb: "02",
+      Mar: "03",
+      Apr: "04",
+      May: "05",
+      Jun: "06",
+      Jul: "07",
+      Aug: "08",
+      Sep: "09",
+      Oct: "10",
+      Nov: "11",
+      Dec: "12",
+    };
+    return `${match[3]}-${months[match[2]] || "01"}-${match[1].padStart(2, "0")}`;
+  }
+  // Handle YYYY-MM-DD already
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Fallback: try Date parse
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  return "";
+}
+
 export default function EmployeeManagementPage() {
   const { data: institutes = [], isLoading: loadingInstitutes } =
     useGetAllInstitutes();
@@ -555,11 +617,20 @@ export default function EmployeeManagementPage() {
       ? allEmployees
       : allEmployees.filter((e) => e.instituteId.toString() === selectedInstId);
 
+  // Fix 4: Auto-select if only one institute exists
+  // Using direct comparison instead of useEffect to avoid lint issues
+  if (institutes.length === 1 && selectedInstId === "all") {
+    setSelectedInstId(institutes[0].id.toString());
+  }
+
   const addMutation = useAddEmployee();
   const updateMutation = useUpdateEmployee();
   const deleteMutation = useDeleteEmployee();
   const deleteAllMutation = useDeleteAllEmployees();
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<"excel" | "pdf">(
+    "excel",
+  );
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -836,10 +907,10 @@ export default function EmployeeManagementPage() {
           const rawStatus = String(row.status || "regular")
             .trim()
             .toLowerCase();
-          const dob = String(row.dob || "2000-01-01").trim();
-          const joiningDate = String(
-            row.joiningDate || new Date().toISOString().split("T")[0],
-          ).trim();
+          const dob = parseDateToISO(row.dob) || "2000-01-01";
+          const joiningDate =
+            parseDateToISO(row.joiningDate) ||
+            new Date().toISOString().split("T")[0];
           const gender = String(row.gender || "").trim();
           const religion = String(row.religion || "").trim();
           const pan = String(row.pan || "").trim();
@@ -851,7 +922,15 @@ export default function EmployeeManagementPage() {
           const email = String(row.email || "").trim();
           const bankName = String(row.bankName || "").trim();
           const bankBranch = String(row.bankBranch || "").trim();
-          const bankAccountNo = String(row.bankAccountNo || "").trim();
+          const rawAcct = row.bankAccountNo ?? row.accountNo;
+          const bankAccountNo =
+            rawAcct !== undefined && rawAcct !== null && rawAcct !== ""
+              ? typeof rawAcct === "number" ||
+                (typeof rawAcct === "string" &&
+                  (rawAcct.includes("e") || rawAcct.includes("E")))
+                ? String(Math.round(Number(rawAcct)))
+                : String(rawAcct).trim()
+              : "";
           const licNosRaw = String(row.licNos || "").trim();
           const licNos = licNosRaw
             ? licNosRaw
@@ -1206,6 +1285,24 @@ export default function EmployeeManagementPage() {
           >
             <Download className="w-4 h-4" /> Sample File
           </Button>
+          <div className="flex items-center gap-1 border border-border/40 rounded-lg p-0.5">
+            <button
+              type="button"
+              title="Download as Excel/CSV"
+              onClick={() => setDownloadFormat("excel")}
+              className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${downloadFormat === "excel" ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+            </button>
+            <button
+              type="button"
+              title="Download as PDF"
+              onClick={() => setDownloadFormat("pdf")}
+              className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${downloadFormat === "pdf" ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <FileText className="w-3.5 h-3.5" /> PDF
+            </button>
+          </div>
           <Button
             variant="outline"
             className="gap-2 border-green-500/40 text-green-500 hover:bg-green-500/10"
@@ -1270,14 +1367,44 @@ export default function EmployeeManagementPage() {
                   .map((v) => `"${String(v).replace(/"/g, '""')}"`)
                   .join(",");
               });
-              const csv = [headers.join(","), ...rows].join("\n");
-              const blob = new Blob([csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
-              a.click();
-              URL.revokeObjectURL(url);
+              if (downloadFormat === "pdf") {
+                // PDF download via print window
+                const tableRows = employees
+                  .map((emp: any) => {
+                    const ex = getEmpExtra(emp.employeeId);
+                    return `<tr>
+                    <td>${emp.employeeId}</td><td>${emp.name}</td>
+                    <td>${ex.designation || emp.designation || ""}</td>
+                    <td>${ex.department || ""}</td>
+                    <td>${String(emp.employmentType)}</td>
+                    <td>${emp.joiningDate || ""}</td>
+                    <td>${ex.phone || ""}</td>
+                    <td>${ex.bankName || ""} ${ex.bankBranch || ""}</td>
+                    <td>${ex.bankAccountNo || ""}</td>
+                  </tr>`;
+                  })
+                  .join("");
+                const html = `<!DOCTYPE html><html><head><title>Employees</title>
+                <style>body{font-family:Arial,sans-serif;font-size:11px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;}th{background:#f5f5f5;font-weight:bold;}h2{margin-bottom:8px;}</style></head>
+                <body><h2>Employee List — ${new Date().toLocaleDateString("en-IN")}</h2>
+                <table><thead><tr><th>Staff No</th><th>Name</th><th>Designation</th><th>Dept</th><th>Type</th><th>DOJ</th><th>Phone</th><th>Bank</th><th>Account No</th></tr></thead>
+                <tbody>${tableRows}</tbody></table></body></html>`;
+                const w = window.open("", "_blank");
+                if (w) {
+                  w.document.write(html);
+                  w.document.close();
+                  w.print();
+                }
+              } else {
+                const csv = [headers.join(","), ...rows].join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }
             }}
             data-ocid="employees.download_button"
           >
@@ -1318,7 +1445,7 @@ export default function EmployeeManagementPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-3"
+        className="flex flex-col sm:flex-row sm:items-center gap-3"
       >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1339,56 +1466,58 @@ export default function EmployeeManagementPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-60">
-          <Select
-            value={selectedInstId}
-            onValueChange={(v) => {
-              setSelectedInstId(v);
-              setSelectedEmployeeFilter("all");
-            }}
-          >
-            <SelectTrigger
-              className="bg-card/60 border-border/60"
-              data-ocid="employees.institute.select"
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Select
+              value={selectedInstId}
+              onValueChange={(v) => {
+                setSelectedInstId(v);
+                setSelectedEmployeeFilter("all");
+              }}
             >
-              <SelectValue placeholder="Select Institute" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72 overflow-y-auto">
-              <SelectItem value="all">All Institutes</SelectItem>
-              {institutes.map((i: Institute) => (
-                <SelectItem key={i.id.toString()} value={i.id.toString()}>
-                  {i.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-60">
-          <Select
-            value={selectedEmployeeFilter}
-            onValueChange={(v) => setSelectedEmployeeFilter(v)}
-          >
-            <SelectTrigger
-              className="bg-card/60 border-border/60"
-              data-ocid="employees.employee.select"
-            >
-              <SelectValue placeholder="All Employees" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72 overflow-y-auto">
-              <SelectItem value="all">All Employees</SelectItem>
-              {employees
-                .filter(
-                  (emp) =>
-                    selectedInstId === "all" ||
-                    emp.instituteId.toString() === selectedInstId,
-                )
-                .map((emp) => (
-                  <SelectItem key={emp.employeeId} value={emp.employeeId}>
-                    {emp.name}
+              <SelectTrigger
+                className="bg-card/60 border-border/60"
+                data-ocid="employees.institute.select"
+              >
+                <SelectValue placeholder="Select Institute" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72 overflow-y-auto">
+                <SelectItem value="all">All Institutes</SelectItem>
+                {institutes.map((i: Institute) => (
+                  <SelectItem key={i.id.toString()} value={i.id.toString()}>
+                    {i.name}
                   </SelectItem>
                 ))}
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-60">
+            <Select
+              value={selectedEmployeeFilter}
+              onValueChange={(v) => setSelectedEmployeeFilter(v)}
+            >
+              <SelectTrigger
+                className="bg-card/60 border-border/60"
+                data-ocid="employees.employee.select"
+              >
+                <SelectValue placeholder="All Employees" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72 overflow-y-auto">
+                <SelectItem value="all">All Employees</SelectItem>
+                {employees
+                  .filter(
+                    (emp) =>
+                      selectedInstId === "all" ||
+                      emp.instituteId.toString() === selectedInstId,
+                  )
+                  .map((emp) => (
+                    <SelectItem key={emp.employeeId} value={emp.employeeId}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </motion.div>
 
@@ -1566,7 +1695,7 @@ export default function EmployeeManagementPage() {
                             remarks: "",
                           });
                         }}
-                        className="flex-1 gap-1.5 text-blue-400 hover:bg-blue-500/10"
+                        className="flex-1 gap-1.5 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"
                       >
                         <TrendingUp className="w-3.5 h-3.5" /> Promote
                       </Button>
@@ -1700,7 +1829,7 @@ export default function EmployeeManagementPage() {
                         <SelectValue placeholder="Select designation" />
                       </SelectTrigger>
                       <SelectContent className="max-h-56 overflow-y-auto">
-                        {DESIGNATIONS.map((d) => (
+                        {getMergedDesignations().map((d) => (
                           <SelectItem key={d} value={d}>
                             {d}
                           </SelectItem>
@@ -1721,7 +1850,7 @@ export default function EmployeeManagementPage() {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent className="max-h-56 overflow-y-auto">
-                        {DEPARTMENTS.map((d) => (
+                        {getMergedDepartments().map((d) => (
                           <SelectItem key={d} value={d}>
                             {d}
                           </SelectItem>

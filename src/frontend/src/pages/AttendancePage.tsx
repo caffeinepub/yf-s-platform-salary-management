@@ -85,12 +85,12 @@ function getSessionMonths(
   if (isCurrentSession) {
     if (currentMonth >= 4) {
       for (let m = 4; m <= currentMonth; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     } else {
       for (let m = 4; m <= 12; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
       for (let m = 1; m <= currentMonth; m++)
-        months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+        months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     }
   } else {
     // Past session: show all 12 months Apr-Mar
@@ -442,7 +442,7 @@ export default function AttendancePage() {
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((inst) => (
                 <SelectItem key={inst.id.toString()} value={inst.id.toString()}>
-                  {inst.name}
+                  {(inst as any).shortCode || inst.name}
                 </SelectItem>
               ))}
             </SelectContent>

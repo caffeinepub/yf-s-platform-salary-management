@@ -1,48 +1,41 @@
-# Yf's Platform - Salary Management
+# Yf's Platform - 12 Fixes
 
 ## Current State
-Full multi-module platform (Salary Management, TallyBooks, Fees Manager) with React/TypeScript frontend and Motoko backend. Many pages and features exist.
+The platform has three modules (Salary Management, TallyBooks, Fees Manager) with shared navigation. The last deployment failed. The following 12 fixes need to be applied.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Settings > User & Password Management: institute selector (default All), employee selector (default All)
-- Reports > Payroll Reports: Consolidated Register report after Bank Statement (format from attachment - summary of salary bills with all columns: Basic Pay, Special Pay, DA, House Rent, Bonus, Conveyance, Washing, LTC Advance, Festival Advance, Incentive, Other Earnings, Gross Salary, House Rent deduction, Electricity, LWF, EPF, VPF, LIC, Employment Tax, Income Tax, Festival Advance, ESIC, Security Deposit, Other Deductions, Total Deductions, Net Payable, Remarks; bank-wise summary table at bottom; Employment Tax institute-wise and Income Tax institute-wise tables; grand total row; prepared by/checked by/secretary/treasurer signature row)
-- Employee Management: download button with Excel/PDF options (default Excel), employee selector below institute selector (default All Employees), employee status shown on employee card
-- Employee Portal: 3-bar hamburger icon to toggle sidebar (like admin), all pages headers with icon + colored head + description line
-- My Salary Slip page: month selector (default latest, descending latest to Apr) + session selector (default latest, descending latest to DOJ year)
-- Salary Details: incentive column after TA column
+- Audit log section in Settings/Admin area: records login date/time, device IP, and actions taken; keeps last 1 month of records
+- Employee management download toggle (Excel icon / PDF icon) before the Download button — spreadsheet icon default
+- Settings section for editing dropdown options: designations, departments, bank names, bank branches
 
 ### Modify
-- Settings > User & Password Management: fix employee fetching from localStorage (key: sms_employees)
-- Settings: merge LWF Configuration inside Salary Structure Configuration; applicable months order Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec, Jan, Feb, Mar
-- Settings > Tax Slab Reference: remove ⓘ icon before PT and IT headings
-- Reports: remove "Yf's Platform" text at top of all report types
-- Payslip page: institute selector default All, employee selector default All, month selector shows all months when previous session selected
-- All pages with month selector: when previous session selected, auto-select the latest available month (not just show April)
-- Salary Processing: when previous month/session is selected, all inputs locked/read-only (not editable)
-- Attendance: when previous month/session selected, attendance locked/non-editable
-- Employee Management: fix Excel upload to import ALL fields (not just id, name, institute)
-- Employee Management > Add Employee: fix spelling "Relieved" (not "Relived")
-- Employee Portal Welcome back section: fix background color in day/light mode
-- My Profile page: move Cancel/Save buttons to bottom (not top); add country code dropdown (+91 default) before phone number
-- Login page: pressing back should close/exit website; after admin login always open dashboard (not last visited page)
-- Daily Rated: period selector format "1-15 Apr" not "Apr 1-15"; list descending (latest first); default latest period selected
-- Sidebar logo: fix broken/blank logo image
+- **Tally XLSX fix**: Add XLSX CDN script tag to `src/frontend/index.html` so Excel upload in Tally works (`<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>`)
+- **Salary selectors**: All month selectors show short names ("Apr", "May", not "April", "March"). All institute selectors show short code, not full name. All institute/employee/month/session selectors have icons.
+- **Branch auto-select**: If selector has only one option, auto-select it everywhere (designation, department, bank branch, employee, institute)
+- **Employee management DOB/DOJ from Excel**: Convert date strings from Excel to `YYYY-MM-DD` format before storing so edit form shows dates correctly. Also ensure `empExtra_` fields (bank, phone, etc.) are included in SYNC_KEYS for cross-device sync.
+- **Promote button hover**: Increase visibility with `hover:text-blue-300 hover:bg-blue-500/20`
+- **Selectors right-aligned in Employee Management**: Add `justify-end` to the filter row container
+- **Account number E+ notation**: When reading from Excel, detect if value is a large float (scientific notation) and convert to full integer string using `Number(val).toFixed(0)`
+- **Salary Details institute column**: Use `shortCode` instead of `name` for the institute column
+- **Daily rated period selector**: Fix period generation to be session-aware (Apr to current month), default to latest period, remove `setTimeout` anti-pattern — use `useMemo` or `useEffect` properly
 
 ### Remove
-- Nothing removed
+- Nothing to remove
 
 ## Implementation Plan
-1. Fix SettingsPage.tsx: employee fetching uses correct key, add institute/employee selectors, merge LWF into salary structure config, fix months order Apr-Mar, remove ⓘ before PT/IT heads
-2. Fix ReportsPage.tsx: remove "Yf's Platform" header text from all report outputs, add Consolidated Register tab in Payroll Reports
-3. Fix PayslipPage.tsx: default All for institute/employee selectors, month selector shows all months when previous session
-4. Fix global month selector behavior: when previous session selected auto-pick latest month (in AttendancePage, SalaryProcessingPage, PayslipPage, ContractWorkersPage, etc.)
-5. Fix SalaryProcessingPage.tsx: lock all inputs when previous month/session selected
-6. Fix AttendancePage.tsx: lock attendance when previous month/session selected
-7. Fix SalaryDetailsPage.tsx: add incentive column after TA
-8. Fix EmployeeManagementPage.tsx: fix Excel upload to parse all columns, add download button (Excel/PDF), add employee selector, show status on card, fix spelling "Relieved"
-9. Fix Employee portal pages: fix welcome back background in day mode, add hamburger sidebar toggle, add standard headers to all pages, fix My Profile buttons + country code, fix My Salary Slip selectors
-10. Fix LoginPage.tsx/App.tsx: back button on login closes website, admin login always goes to dashboard
-11. Fix DailyWorkersPage.tsx: period format "1-15 Apr", descending order, default latest
-12. Fix sidebar logo loading issue
+1. Fix `index.html` — add XLSX CDN script tag
+2. Fix month display names throughout — create/update `MONTHS_SHORT` helper returning "Apr", "May", etc.
+3. Fix institute selector display — use `shortCode` in all SelectItem lists for institutes
+4. Fix account number E+ parsing in Excel upload
+5. Fix DOB/DOJ date format in Excel upload (convert to YYYY-MM-DD)
+6. Fix `empExtra_` keys not in SYNC_KEYS (add dynamic sync for extra employee data)
+7. Fix Salary Details institute short code display
+8. Fix Daily Rated period selector (proper default, session-aware periods)
+9. Add promote button better hover styling
+10. Fix Employee Management filter row right-alignment
+11. Add Excel/PDF download toggle in Employee Management
+12. Add Audit Log tracking
+13. Fix branch auto-select universally
+14. Add Settings section for editable dropdown options

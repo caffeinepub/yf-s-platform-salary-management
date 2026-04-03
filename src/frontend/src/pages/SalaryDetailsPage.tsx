@@ -220,7 +220,7 @@ export default function SalaryDetailsPage() {
               <SelectItem value="all">All Institutes</SelectItem>
               {institutes.map((i: Institute) => (
                 <SelectItem key={i.id.toString()} value={i.id.toString()}>
-                  {i.name}
+                  {(i as any).shortCode || i.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -343,10 +343,11 @@ export default function SalaryDetailsPage() {
                         "vpfValue",
                         String(extra.vpfValue || "0"),
                       );
+                      const instMatch = institutes.find(
+                        (i: Institute) => i.id === emp.instituteId,
+                      );
                       const instName =
-                        institutes.find(
-                          (i: Institute) => i.id === emp.instituteId,
-                        )?.name ?? "—";
+                        (instMatch as any)?.shortCode || instMatch?.name || "—";
                       const displayDesignation =
                         extra.designation || emp.designation;
                       return (
