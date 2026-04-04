@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { IndianRupee, Loader2, Users } from "lucide-react";
+import { Building2, IndianRupee, Loader2, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -214,7 +214,10 @@ export default function SalaryDetailsPage() {
               className="bg-card/60 border-border/60 w-44"
               data-ocid="salary_details.institute.select"
             >
-              <SelectValue placeholder="All Institutes" />
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="All Institutes" />
+              </div>
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
               <SelectItem value="all">All Institutes</SelectItem>

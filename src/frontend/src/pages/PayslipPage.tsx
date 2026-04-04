@@ -8,7 +8,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, FileText, Lock, Printer, Users } from "lucide-react";
+import {
+  Building2,
+  Calendar,
+  CalendarDays,
+  FileText,
+  Lock,
+  Printer,
+  Users,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import {
@@ -21,6 +29,22 @@ import {
   getSessionList,
   getYearFromSession,
 } from "../utils/sessionUtils";
+
+function getEmpExtra(employeeId: string) {
+  try {
+    return JSON.parse(localStorage.getItem(`empExtra_${employeeId}`) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function isActiveEmployee(emp: { employeeId?: string; id?: bigint }): boolean {
+  const empId = emp.employeeId || (emp.id ? emp.id.toString() : "");
+  if (!empId) return true;
+  const extra = getEmpExtra(empId);
+  const status = extra.employeeStatus || "Active";
+  return status === "Active" || status === "" || !status;
+}
 
 const MONTH_NAMES = [
   "January",
@@ -113,7 +137,8 @@ export default function PayslipPage() {
   const year = getYearFromSession(session, month);
 
   const { data: institutes = [] } = useGetAllInstitutes();
-  const { data: employees = [] } = useGetEmployeesForInstitute(instituteId);
+  const { data: rawEmployees = [] } = useGetEmployeesForInstitute(instituteId);
+  const employees = rawEmployees.filter(isActiveEmployee);
   const { data: salary, isLoading } = useGetSalary(employeeId, month, year);
 
   const selectedInstitute = institutes.find((i) => i.id === instituteId);
@@ -182,6 +207,7 @@ export default function PayslipPage() {
             onValueChange={(v) => setMonth(Number(v))}
           >
             <SelectTrigger className="w-32 h-9" data-ocid="payslip.select">
+              <Calendar className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
@@ -194,6 +220,7 @@ export default function PayslipPage() {
           </Select>
           <Select value={session} onValueChange={handleSessionChange}>
             <SelectTrigger className="w-28 h-9" data-ocid="payslip.select">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">

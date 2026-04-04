@@ -137,7 +137,7 @@ function EmployeeApp() {
       <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
         <div className="w-9 h-9 rounded-lg overflow-hidden border border-primary/30 flex-shrink-0">
           <img
-            src="/assets/uploads/file_0000000098e07208a686dfee13498f2c-1.png"
+            src="/assets/uploads/logo-1.png"
             alt="Logo"
             className="w-full h-full object-cover"
             onError={(e) => {

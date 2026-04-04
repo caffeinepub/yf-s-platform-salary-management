@@ -1247,6 +1247,17 @@ function EmployeeSettingsSection() {
   });
   const [newDesig, setNewDesig] = useState("");
   const [newDept, setNewDept] = useState("");
+  const [banks, setBanks] = useState<{ name: string; branches: string[] }[]>(
+    () => {
+      try {
+        return JSON.parse(localStorage.getItem("sms_custom_banks") || "[]");
+      } catch {
+        return [];
+      }
+    },
+  );
+  const [newBankName, setNewBankName] = useState("");
+  const [newBankBranches, setNewBankBranches] = useState("");
 
   function saveDesig(list: string[]) {
     setDesignations(list);
@@ -1259,6 +1270,12 @@ function EmployeeSettingsSection() {
     localStorage.setItem("sms_custom_departments", JSON.stringify(list));
     syncKeyToBackend("sms_custom_departments", JSON.stringify(list));
     toast.success("Departments updated.");
+  }
+  function saveBanks(list: { name: string; branches: string[] }[]) {
+    setBanks(list);
+    localStorage.setItem("sms_custom_banks", JSON.stringify(list));
+    syncKeyToBackend("sms_custom_banks", JSON.stringify(list));
+    toast.success("Banks updated.");
   }
 
   return (
@@ -1404,6 +1421,98 @@ function EmployeeSettingsSection() {
                         className="h-6 w-6 text-red-400 hover:bg-red-500/10"
                         onClick={() =>
                           saveDept(departments.filter((_, j) => j !== i))
+                        }
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Custom Banks */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Custom Banks</p>
+              <p className="text-xs text-muted-foreground">
+                Add bank name and its branches (comma-separated)
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Input
+                  placeholder="Bank name"
+                  value={newBankName}
+                  onChange={(e) => setNewBankName(e.target.value)}
+                  className="text-sm flex-1 min-w-[120px]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newBankName.trim()) {
+                      saveBanks([
+                        ...banks,
+                        {
+                          name: newBankName.trim(),
+                          branches: newBankBranches
+                            .split(",")
+                            .map((b) => b.trim())
+                            .filter(Boolean),
+                        },
+                      ]);
+                      setNewBankName("");
+                      setNewBankBranches("");
+                    }
+                  }}
+                />
+                <Input
+                  placeholder="Branches (comma-separated)"
+                  value={newBankBranches}
+                  onChange={(e) => setNewBankBranches(e.target.value)}
+                  className="text-sm flex-1 min-w-[150px]"
+                />
+                <Button
+                  size="sm"
+                  className="gradient-primary h-9"
+                  onClick={() => {
+                    if (newBankName.trim()) {
+                      saveBanks([
+                        ...banks,
+                        {
+                          name: newBankName.trim(),
+                          branches: newBankBranches
+                            .split(",")
+                            .map((b) => b.trim())
+                            .filter(Boolean),
+                        },
+                      ]);
+                      setNewBankName("");
+                      setNewBankBranches("");
+                    }
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {banks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No custom banks added yet.
+                </p>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {banks.map((b, i) => (
+                    <div
+                      key={b.name}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-card/40 border border-border/30"
+                    >
+                      <div>
+                        <span className="text-sm font-medium">{b.name}</span>
+                        {b.branches.length > 0 && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({b.branches.join(", ")})
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-red-400 hover:bg-red-500/10"
+                        onClick={() =>
+                          saveBanks(banks.filter((_, j) => j !== i))
                         }
                       >
                         <Trash2 className="w-3 h-3" />
@@ -1570,11 +1679,11 @@ export default function SettingsPage() {
         transition={{ delay: 0.08 }}
         className="grid grid-cols-1 md:grid-cols-2 gap-4"
       >
-        <UserPasswordSection />
+        <EmployeeSettingsSection />
         <SalaryConfigSection />
         <DailyWorkerRateSection />
         <ContractWorkerRateSection />
-        <EmployeeSettingsSection />
+        <UserPasswordSection />
         <AuditLogSection />
         <BackupRestoreSection />
         <TaxSlabsSection />

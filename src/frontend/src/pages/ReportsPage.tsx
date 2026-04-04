@@ -26,6 +26,7 @@ import {
   FileText,
   Gift,
   Landmark,
+  MapPin,
   Printer,
   Receipt,
   ShieldCheck,
@@ -2032,6 +2033,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
             onValueChange={setSelectedSessionYear}
           >
             <SelectTrigger className="w-28 h-9">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="Session" />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
@@ -2131,6 +2133,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                           onValueChange={setSelectedBank}
                         >
                           <SelectTrigger className="h-7 text-xs flex-1">
+                            <Landmark className="w-3 h-3 mr-1 text-muted-foreground flex-shrink-0" />
                             <SelectValue placeholder="Bank" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[200px] overflow-y-auto">
@@ -2156,6 +2159,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                           onValueChange={setSelectedBranch}
                         >
                           <SelectTrigger className="h-7 text-xs flex-1">
+                            <MapPin className="w-3 h-3 mr-1 text-muted-foreground flex-shrink-0" />
                             <SelectValue placeholder="Branch" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[200px] overflow-y-auto">

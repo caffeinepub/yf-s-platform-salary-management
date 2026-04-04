@@ -17,6 +17,7 @@ import {
 import {
   Building2,
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   Clock,
   Lock,
@@ -43,6 +44,20 @@ import {
   getSessionList,
   getYearFromSession,
 } from "../utils/sessionUtils";
+
+function getEmpExtra(employeeId: string) {
+  try {
+    return JSON.parse(localStorage.getItem(`empExtra_${employeeId}`) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function isActiveEmployee(emp: { employeeId: string }): boolean {
+  const extra = getEmpExtra(emp.employeeId);
+  const status = extra.employeeStatus || "Active";
+  return status === "Active" || status === "" || !status;
+}
 
 const MONTH_NAMES = [
   "January",
@@ -247,8 +262,9 @@ export default function AttendancePage() {
   const { data: instEmployeesData = [] } = useGetEmployeesForInstitute(
     instituteId !== "all" ? BigInt(instituteId) : null,
   );
-  const employees =
-    instituteId === "all" ? allEmployeesData : instEmployeesData;
+  const employees = (
+    instituteId === "all" ? allEmployeesData : instEmployeesData
+  ).filter(isActiveEmployee);
 
   const specificEmployeeId =
     employeeSelection !== "all" ? employeeSelection : null;
@@ -493,6 +509,7 @@ export default function AttendancePage() {
             }}
           >
             <SelectTrigger className="w-28 h-9" data-ocid="attendance.select">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">

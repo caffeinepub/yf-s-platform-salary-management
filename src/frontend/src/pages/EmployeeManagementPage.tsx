@@ -292,6 +292,37 @@ const BANK_BRANCHES: Record<string, string[]> = {
   "State Bank of India": ["(HET) Piplani", "(K.H) Habibganj"],
 };
 
+function getMergedBankNames(): string[] {
+  try {
+    const custom: { name: string; branches: string[] }[] = JSON.parse(
+      localStorage.getItem("sms_custom_banks") || "[]",
+    );
+    return [
+      ...BANK_NAMES,
+      ...custom.map((b) => b.name).filter((n) => !BANK_NAMES.includes(n)),
+    ];
+  } catch {
+    return BANK_NAMES;
+  }
+}
+
+function getMergedBankBranches(): Record<string, string[]> {
+  try {
+    const custom: { name: string; branches: string[] }[] = JSON.parse(
+      localStorage.getItem("sms_custom_banks") || "[]",
+    );
+    const merged: Record<string, string[]> = { ...BANK_BRANCHES };
+    for (const b of custom) {
+      if (b.name && b.branches.length > 0) {
+        merged[b.name] = b.branches;
+      }
+    }
+    return merged;
+  } catch {
+    return BANK_BRANCHES;
+  }
+}
+
 const COUNTRY_CODES: string[] = [
   "+91",
   "+1",
@@ -709,11 +740,15 @@ export default function EmployeeManagementPage() {
 
   const [form, setForm] = useState<EmpForm>(EMPTY_FORM);
 
-  const filtered = employees.filter(
-    (e) =>
+  const filtered = employees.filter((e) => {
+    const matchesSearch =
       e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.employeeId.toLowerCase().includes(search.toLowerCase()),
-  );
+      e.employeeId.toLowerCase().includes(search.toLowerCase());
+    const matchesEmpFilter =
+      selectedEmployeeFilter === "all" ||
+      e.employeeId === selectedEmployeeFilter;
+    return matchesSearch && matchesEmpFilter;
+  });
 
   const openAdd = () => {
     setEditTarget(null);
@@ -745,7 +780,13 @@ export default function EmployeeManagementPage() {
       joiningDate: emp.joiningDate,
       basicSalary: emp.basicSalary.toString(),
       bankName: extra.bankName || "",
-      bankBranch: extra.bankBranch || "",
+      bankBranch: (() => {
+        const bn = extra.bankName || "";
+        const existingBranch = extra.bankBranch || "";
+        if (existingBranch) return existingBranch;
+        const branches = getMergedBankBranches()[bn] || [];
+        return branches.length === 1 ? branches[0] : "";
+      })(),
       bankAccountNo: extra.bankAccountNo || extra.bankAccount || "",
       ifscCode: extra.ifscCode || "",
       panNo: extra.panNo || extra.panNumber || "",
@@ -1285,22 +1326,22 @@ export default function EmployeeManagementPage() {
           >
             <Download className="w-4 h-4" /> Sample File
           </Button>
-          <div className="flex items-center gap-1 border border-border/40 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 border border-border/60 rounded-lg p-0.5 bg-muted/40">
             <button
               type="button"
-              title="Download as Excel/CSV"
+              title="Download as Excel"
               onClick={() => setDownloadFormat("excel")}
-              className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${downloadFormat === "excel" ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-1.5 rounded transition-colors ${downloadFormat === "excel" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+              <FileSpreadsheet className="w-4 h-4" />
             </button>
             <button
               type="button"
               title="Download as PDF"
               onClick={() => setDownloadFormat("pdf")}
-              className={`px-2 py-1 rounded text-xs flex items-center gap-1 transition-colors ${downloadFormat === "pdf" ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-1.5 rounded transition-colors ${downloadFormat === "pdf" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
             >
-              <FileText className="w-3.5 h-3.5" /> PDF
+              <FileText className="w-4 h-4" />
             </button>
           </div>
           <Button
@@ -1479,7 +1520,10 @@ export default function EmployeeManagementPage() {
                 className="bg-card/60 border-border/60"
                 data-ocid="employees.institute.select"
               >
-                <SelectValue placeholder="Select Institute" />
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <SelectValue placeholder="Select Institute" />
+                </div>
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 <SelectItem value="all">All Institutes</SelectItem>
@@ -1500,7 +1544,10 @@ export default function EmployeeManagementPage() {
                 className="bg-card/60 border-border/60"
                 data-ocid="employees.employee.select"
               >
-                <SelectValue placeholder="All Employees" />
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <SelectValue placeholder="All Employees" />
+                </div>
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 <SelectItem value="all">All Employees</SelectItem>
@@ -2121,7 +2168,7 @@ export default function EmployeeManagementPage() {
                           value={form.bankName}
                           onValueChange={(v) => {
                             setField("bankName", v);
-                            const branches = BANK_BRANCHES[v] || [];
+                            const branches = getMergedBankBranches()[v] || [];
                             setField(
                               "bankBranch",
                               branches.length === 1 ? branches[0] : "",
@@ -2135,7 +2182,7 @@ export default function EmployeeManagementPage() {
                             <SelectValue placeholder="Select bank" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[250px] overflow-y-auto">
-                            {BANK_NAMES.map((b) => (
+                            {getMergedBankNames().map((b) => (
                               <SelectItem key={b} value={b}>
                                 {b}
                               </SelectItem>
@@ -2156,11 +2203,13 @@ export default function EmployeeManagementPage() {
                             <SelectValue placeholder="Select branch" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[250px] overflow-y-auto">
-                            {(BANK_BRANCHES[form.bankName] || []).map((b) => (
-                              <SelectItem key={b} value={b}>
-                                {b}
-                              </SelectItem>
-                            ))}
+                            {(getMergedBankBranches()[form.bankName] || []).map(
+                              (b) => (
+                                <SelectItem key={b} value={b}>
+                                  {b}
+                                </SelectItem>
+                              ),
+                            )}
                           </SelectContent>
                         </Select>
                       </div>

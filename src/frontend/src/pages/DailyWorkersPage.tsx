@@ -526,6 +526,7 @@ export default function DailyWorkersPage() {
           </Select>
           <Select value={selectedSession} onValueChange={setSelectedSession}>
             <SelectTrigger className="w-28 h-9">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">

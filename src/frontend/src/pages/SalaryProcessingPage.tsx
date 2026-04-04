@@ -263,6 +263,13 @@ function defaultInputs(emp: LocalEmployee): SalaryInputs {
       return 0;
     }
   })();
+  const empIncentive = (() => {
+    try {
+      return Number(getEmpExtra(emp.employeeId).incentive) || 0;
+    } catch {
+      return 0;
+    }
+  })();
   return {
     specialPay: 0,
     daPercent: isRegular ? 257 : 0,
@@ -275,7 +282,7 @@ function defaultInputs(emp: LocalEmployee): SalaryInputs {
     washingAllowance: 0,
     ltc: 0,
     festivalAdvance: 0,
-    incentive: 0,
+    incentive: empIncentive,
     otherEarnings: 0,
     houseRent: 0,
     electricityCharges: 0,
@@ -639,7 +646,15 @@ export default function SalaryProcessingPage() {
     Record<string, { lwpPrev: number; lwpCurr: number }>
   >({});
 
-  const employees = localGetAllEmployees();
+  const employees = localGetAllEmployees().filter((emp) => {
+    try {
+      const extra = getEmpExtra(emp.employeeId);
+      const status = extra.employeeStatus || "Active";
+      return status === "Active" || status === "" || !status;
+    } catch {
+      return true;
+    }
+  });
   const institutes = localGetAllInstitutes();
   const attendance = getAttendance();
   const salaries = getSalaries();
@@ -910,6 +925,7 @@ export default function SalaryProcessingPage() {
             }}
           >
             <SelectTrigger className="w-28 h-9">
+              <CalendarDays className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">
@@ -1454,7 +1470,16 @@ export default function SalaryProcessingPage() {
                             </>
                           )}
 
-                          {/* Temporary-only: Arrears */}
+                          {/* Regular employees: read-only TA from salary details */}
+                          {!isTemporary && (
+                            <PrefixReadOnly
+                              label="TA"
+                              prefix="Sal.Det."
+                              value={inputs.ta}
+                            />
+                          )}
+
+                          {/* Temporary-only: Arrears + read-only TA */}
                           {isTemporary && (
                             <>
                               <NumInput
@@ -1464,10 +1489,10 @@ export default function SalaryProcessingPage() {
                                   setInputField(empKey, "arrears", v)
                                 }
                               />
-                              <NumInput
+                              <PrefixReadOnly
                                 label="TA"
+                                prefix="Sal.Det."
                                 value={inputs.ta}
-                                onChange={(v) => setInputField(empKey, "ta", v)}
                               />
                             </>
                           )}
@@ -1498,12 +1523,10 @@ export default function SalaryProcessingPage() {
                               setInputField(empKey, "festivalAdvance", v)
                             }
                           />
-                          <NumInput
+                          <PrefixReadOnly
                             label="Incentive"
+                            prefix="Sal.Det."
                             value={inputs.incentive}
-                            onChange={(v) =>
-                              setInputField(empKey, "incentive", v)
-                            }
                           />
                           <NumInput
                             label="Other Earnings"
@@ -1716,12 +1739,115 @@ export default function SalaryProcessingPage() {
                             );
                           })()}
 
-                          {/* Prof Tax */}
-                          <PrefixReadOnly
-                            label="Prof. Tax"
-                            prefix="PT"
-                            value={preview.profTax}
-                          />
+                          {/* Prof Tax with breakdown */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Label className="text-[10px] text-muted-foreground">
+                                Prof. Tax
+                              </Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center w-3.5 h-3.5 text-muted-foreground/60 hover:text-primary transition-colors"
+                                    data-ocid="salary.pt_breakdown.open_modal_button"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-72 p-3"
+                                  side="top"
+                                  align="start"
+                                >
+                                  <p className="text-xs font-semibold text-foreground mb-2">
+                                    Professional Tax Breakdown
+                                  </p>
+                                  <div className="space-y-1 text-[11px]">
+                                    <div className="flex justify-between text-muted-foreground mb-1">
+                                      <span>Monthly Gross</span>
+                                      <span>
+                                        ₹
+                                        {(
+                                          preview.grossEarnings ?? 0
+                                        ).toLocaleString("en-IN")}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between text-muted-foreground mb-2">
+                                      <span>Annual Gross (Projected)</span>
+                                      <span>
+                                        ₹
+                                        {(
+                                          preview.annualGross ?? 0
+                                        ).toLocaleString("en-IN")}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mb-1">
+                                      PT Slab
+                                    </p>
+                                    {[
+                                      {
+                                        range: "Below ₹2,25,000",
+                                        monthly: "₹0",
+                                        active:
+                                          (preview.annualGross ?? 0) < 225000,
+                                      },
+                                      {
+                                        range: "₹2,25,000 – ₹3,00,000",
+                                        monthly: "₹125",
+                                        active:
+                                          (preview.annualGross ?? 0) >=
+                                            225000 &&
+                                          (preview.annualGross ?? 0) < 300000,
+                                      },
+                                      {
+                                        range: "₹3,00,001 – ₹4,00,000",
+                                        monthly: "₹167",
+                                        active:
+                                          (preview.annualGross ?? 0) >=
+                                            300000 &&
+                                          (preview.annualGross ?? 0) < 400000,
+                                      },
+                                      {
+                                        range: "₹4,00,001+",
+                                        monthly: "₹208",
+                                        active:
+                                          (preview.annualGross ?? 0) >= 400000,
+                                      },
+                                    ].map((slab) => (
+                                      <div
+                                        key={slab.range}
+                                        className={`flex justify-between py-0.5 ${slab.active ? "text-green-400 font-semibold" : "text-muted-foreground"}`}
+                                      >
+                                        <span>{slab.range}</span>
+                                        <span>{slab.monthly}/mo</span>
+                                      </div>
+                                    ))}
+                                    <div className="flex justify-between border-t border-border/40 mt-1 pt-1 font-semibold text-foreground">
+                                      <span>Monthly P. Tax</span>
+                                      <span>
+                                        ₹
+                                        {(preview.profTax ?? 0).toLocaleString(
+                                          "en-IN",
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="h-7 px-2 flex items-center text-xs font-mono bg-muted/40 border border-r-0 border-border/60 rounded-l text-muted-foreground">
+                                PT
+                              </span>
+                              <input
+                                type="number"
+                                value={preview.profTax || ""}
+                                readOnly
+                                className="h-7 text-xs rounded-l-none border border-l-0 border-border/60 opacity-70 cursor-default bg-card/30 flex-1 min-w-0 px-2"
+                              />
+                            </div>
+                          </div>
 
                           {/* Income Tax with breakdown */}
                           <div className="space-y-1">
