@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   FileText,
   GraduationCap,
+  HardHat,
   Lock,
   LogOut,
   Pencil,
@@ -464,7 +465,7 @@ export default function ContractWorkersPage() {
           </Select>
           <Select value={filterWorker} onValueChange={setFilterWorker}>
             <SelectTrigger className="w-40 h-9">
-              <Briefcase className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+              <HardHat className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
               <SelectValue placeholder="All Workers" />
             </SelectTrigger>
             <SelectContent className="max-h-[250px] overflow-y-auto">

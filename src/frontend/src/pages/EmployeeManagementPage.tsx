@@ -53,6 +53,7 @@ import {
   FileUp,
   Filter,
   History,
+  Landmark,
   Loader2,
   MapPin,
   Pencil,
@@ -1520,10 +1521,8 @@ export default function EmployeeManagementPage() {
                 className="bg-card/60 border-border/60"
                 data-ocid="employees.institute.select"
               >
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <SelectValue placeholder="Select Institute" />
-                </div>
+                <Building2 className="w-4 h-4 mr-1 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="All Institutes" />
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 <SelectItem value="all">All Institutes</SelectItem>
@@ -1544,10 +1543,8 @@ export default function EmployeeManagementPage() {
                 className="bg-card/60 border-border/60"
                 data-ocid="employees.employee.select"
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <SelectValue placeholder="All Employees" />
-                </div>
+                <Users className="w-4 h-4 mr-1 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="All Employees" />
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 <SelectItem value="all">All Employees</SelectItem>
@@ -2179,6 +2176,7 @@ export default function EmployeeManagementPage() {
                             className={inputCls}
                             data-ocid="employees.bank_name.select"
                           >
+                            <Landmark className="w-3.5 h-3.5 mr-1 text-muted-foreground flex-shrink-0" />
                             <SelectValue placeholder="Select bank" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[250px] overflow-y-auto">
@@ -2200,6 +2198,7 @@ export default function EmployeeManagementPage() {
                             className={inputCls}
                             data-ocid="employees.bank_branch.select"
                           >
+                            <MapPin className="w-3.5 h-3.5 mr-1 text-muted-foreground flex-shrink-0" />
                             <SelectValue placeholder="Select branch" />
                           </SelectTrigger>
                           <SelectContent className="max-h-[250px] overflow-y-auto">
