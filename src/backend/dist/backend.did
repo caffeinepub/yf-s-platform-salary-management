@@ -1,0 +1,9 @@
+service : {
+  get: (key: text) -> (opt text) query;
+  getAll: () -> (vec record {
+                       text;
+                       text;
+                     }) query;
+  remove: (key: text) -> ();
+  set: (key: text, value: text) -> ();
+}

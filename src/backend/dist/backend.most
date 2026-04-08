@@ -1,0 +1,124 @@
+// Version: 1.0.0
+type AttendanceRecord__852829031 =
+  {
+    days : [Text];
+    employeeId : Nat;
+    isLocked : Bool;
+    month : Nat;
+    totalAbsent : Nat;
+    totalPresent : Nat;
+    year : Nat
+  };
+type DailyWorker__508169659 =
+  {
+    attendanceDays : Nat;
+    id : Nat;
+    instituteId : Nat;
+    name : Text;
+    periodFrom : Text;
+    periodTo : Text;
+    ratePerDay : Nat;
+    totalPayable : Nat
+  };
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Designation__885070497 =
+  {
+    #adminStaff;
+    #humanResources;
+    #lecturer;
+    #officer;
+    #professor;
+    #researchEngineer;
+    #scientist
+  };
+type Employee__476045079 =
+  {
+    address : Text;
+    basicSalary : Nat;
+    designation : Designation__885070497;
+    dob : Text;
+    employeeId : Text;
+    employmentType : EmploymentType__818422;
+    id : Nat;
+    instituteId : Nat;
+    joiningDate : Text;
+    name : Text
+  };
+type EmploymentType__818422 = {#regular; #temporary};
+type Institute__227813568 =
+  {code : Text; id : Nat; location : Text; name : Text};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type SalaryRecord__162271539 =
+  {
+    basicSalary : Nat;
+    da : Nat;
+    employeeId : Nat;
+    esic : Nat;
+    grossSalary : Nat;
+    hra : Nat;
+    isLocked : Bool;
+    month : Nat;
+    netSalary : Nat;
+    pf : Nat;
+    pt : Nat;
+    totalDeductions : Nat;
+    year : Nat
+  };
+type UserProfile__491224006 = {employeeId : ?Nat; name : Text};
+type UserRole__599675725 = {#admin; #guest; #user};
+actor {
+  stable var accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__599675725>
+    };
+  stable attendanceRecords :
+    {
+      var root : Node__46230540<Text, AttendanceRecord__852829031>;
+      var size : Nat__490723111
+    };
+  stable dailyWorkers :
+    {
+      var root : Node__46230540<Nat, DailyWorker__508169659>;
+      var size : Nat__490723111
+    };
+  stable employees :
+    {
+      var root : Node__46230540<Nat, Employee__476045079>;
+      var size : Nat__490723111
+    };
+  stable institutes :
+    {
+      var root : Node__46230540<Nat, Institute__227813568>;
+      var size : Nat__490723111
+    };
+  stable var kvEntries : [(Text, Text)];
+  stable kvStore :
+    {var root : Node__46230540<Text, Text>; var size : Nat__490723111};
+  stable var nextDailyWorkerId : Nat;
+  stable var nextEmployeeId : Nat;
+  stable var nextInstituteId : Nat;
+  stable principalToEmployeeId :
+    {var root : Node__46230540<Principal, Nat>; var size : Nat__490723111};
+  stable salaryRecords :
+    {
+      var root : Node__46230540<Text, SalaryRecord__162271539>;
+      var size : Nat__490723111
+    };
+  stable userProfiles :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    }
+};

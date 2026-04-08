@@ -650,7 +650,7 @@ export default function SalaryProcessingPage() {
     try {
       const extra = getEmpExtra(emp.employeeId);
       const status = extra.employeeStatus || "Active";
-      return status === "Active" || status === "" || !status;
+      return !status || status === "" || status.toLowerCase() === "active";
     } catch {
       return true;
     }
@@ -832,7 +832,7 @@ export default function SalaryProcessingPage() {
         ),
     );
     saveSalaries(updated);
-    toast.error("Salary record deleted and unlocked.");
+    toast.success("Salary record deleted and unlocked.");
     setDeleteTarget(null);
   }
 
@@ -1472,11 +1472,17 @@ export default function SalaryProcessingPage() {
 
                           {/* Regular employees: read-only TA from salary details */}
                           {!isTemporary && (
-                            <PrefixReadOnly
-                              label="TA"
-                              prefix="Sal.Det."
-                              value={inputs.ta}
-                            />
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">
+                                TA
+                              </Label>
+                              <Input
+                                type="number"
+                                value={inputs.ta || ""}
+                                readOnly
+                                className="h-7 text-xs opacity-70 cursor-default bg-card/30"
+                              />
+                            </div>
                           )}
 
                           {/* Temporary-only: Arrears + read-only TA */}
@@ -1489,11 +1495,17 @@ export default function SalaryProcessingPage() {
                                   setInputField(empKey, "arrears", v)
                                 }
                               />
-                              <PrefixReadOnly
-                                label="TA"
-                                prefix="Sal.Det."
-                                value={inputs.ta}
-                              />
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  TA
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={inputs.ta || ""}
+                                  readOnly
+                                  className="h-7 text-xs opacity-70 cursor-default bg-card/30"
+                                />
+                              </div>
                             </>
                           )}
 
@@ -1523,11 +1535,17 @@ export default function SalaryProcessingPage() {
                               setInputField(empKey, "festivalAdvance", v)
                             }
                           />
-                          <PrefixReadOnly
-                            label="Incentive"
-                            prefix="Sal.Det."
-                            value={inputs.incentive}
-                          />
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Incentive
+                            </Label>
+                            <Input
+                              type="number"
+                              value={inputs.incentive || ""}
+                              readOnly
+                              className="h-7 text-xs opacity-70 cursor-default bg-card/30"
+                            />
+                          </div>
                           <NumInput
                             label="Other Earnings"
                             value={inputs.otherEarnings}

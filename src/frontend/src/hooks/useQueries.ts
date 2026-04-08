@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Designation, EmploymentType } from "../backend";
 import type {
   LocalAttendanceRecord,
   LocalDailyWorker,
@@ -34,7 +33,23 @@ import {
   localUpdateInstitute,
 } from "./localStore";
 
-export { Designation, EmploymentType };
+// Re-export compatibility types — Designation/EmploymentType as enum-like objects
+// biome-ignore lint: these need dual type+value export
+export type Designation = string;
+// biome-ignore lint: these need dual type+value export
+export const Designation: Record<string, string> = {
+  lecturer: "Lecturer",
+  adminStaff: "Admin Staff",
+  officer: "Officer",
+};
+
+// biome-ignore lint: these need dual type+value export
+export type EmploymentType = "regular" | "temporary";
+// biome-ignore lint: these need dual type+value export
+export const EmploymentType = {
+  regular: "regular" as const,
+  temporary: "temporary" as const,
+};
 
 // ─── Type adapters (localStorage numbers ↔ bigint for page compat) ────────────
 

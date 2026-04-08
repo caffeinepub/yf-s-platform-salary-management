@@ -109,15 +109,19 @@ export default function SalaryDetailsPage() {
     idx: number,
     value: string,
     count: number,
+    empBasic?: string,
   ) {
     setSalaryEdits((prev) => {
+      const extra = getEmpExtra(empId);
       const existing = prev[empId] ?? {
-        basic: "0",
-        ta: "0",
-        incentive: "0",
-        vpfMode: "percent",
-        vpfValue: "0",
-        licAmounts: Array(count).fill("0"),
+        basic: empBasic ?? String(extra.basic || "0"),
+        ta: String(extra.ta || "0"),
+        incentive: String(extra.incentive || "0"),
+        vpfMode: extra.vpfMode || "percent",
+        vpfValue: String(extra.vpfValue || "0"),
+        licAmounts: Array.isArray(extra.licAmounts)
+          ? extra.licAmounts.map(String)
+          : Array(count).fill("0"),
       };
       const licAmounts = existing.licAmounts
         ? [...existing.licAmounts]
@@ -131,15 +135,19 @@ export default function SalaryDetailsPage() {
     empId: string,
     field: "basic" | "ta" | "incentive" | "vpfMode" | "vpfValue",
     value: string,
+    empBasic?: string,
   ) {
     setSalaryEdits((prev) => {
+      const extra = getEmpExtra(empId);
       const existing = prev[empId] ?? {
-        basic: "0",
-        ta: "0",
-        incentive: "0",
-        vpfMode: "percent",
-        vpfValue: "0",
-        licAmounts: [],
+        basic: empBasic ?? String(extra.basic || "0"),
+        ta: String(extra.ta || "0"),
+        incentive: String(extra.incentive || "0"),
+        vpfMode: extra.vpfMode || "percent",
+        vpfValue: String(extra.vpfValue || "0"),
+        licAmounts: Array.isArray(extra.licAmounts)
+          ? extra.licAmounts.map(String)
+          : [],
       };
       return { ...prev, [empId]: { ...existing, [field]: value } };
     });
@@ -228,11 +236,7 @@ export default function SalaryDetailsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={selectedEmpId}
-            onValueChange={setSelectedEmpId}
-            disabled={instId === "all"}
-          >
+          <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>
             <SelectTrigger
               className="bg-card/60 border-border/60 w-44"
               data-ocid="salary_details.employee.select"
@@ -271,9 +275,7 @@ export default function SalaryDetailsPage() {
             No employees found
           </p>
           <p className="text-sm text-muted-foreground mt-1">
-            {instId === "all"
-              ? "Select an institute to view employees"
-              : "Add employees first to manage salary details"}
+            Add employees first to manage salary details
           </p>
         </motion.div>
       ) : (
@@ -326,10 +328,11 @@ export default function SalaryDetailsPage() {
                   <TableBody>
                     {filteredEmps.map((emp: Employee, idx: number) => {
                       const extra = getEmpExtra(emp.employeeId);
+                      const empBasicStr = emp.basicSalary.toString();
                       const basicVal = getEdit(
                         emp.employeeId,
                         "basic",
-                        emp.basicSalary.toString(),
+                        empBasicStr,
                       );
                       const taVal = getEdit(
                         emp.employeeId,
@@ -383,6 +386,7 @@ export default function SalaryDetailsPage() {
                                   emp.employeeId,
                                   "basic",
                                   e.target.value,
+                                  empBasicStr,
                                 )
                               }
                               className="h-8 text-sm text-gray-900 bg-white border-border/60 w-32"
@@ -399,6 +403,7 @@ export default function SalaryDetailsPage() {
                                   emp.employeeId,
                                   "ta",
                                   e.target.value,
+                                  empBasicStr,
                                 )
                               }
                               className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
@@ -419,6 +424,7 @@ export default function SalaryDetailsPage() {
                                   emp.employeeId,
                                   "incentive",
                                   e.target.value,
+                                  empBasicStr,
                                 )
                               }
                               className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
@@ -427,8 +433,8 @@ export default function SalaryDetailsPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            {/* VPF: mode toggle + value */}
-                            <div className="flex items-center gap-1">
+                            {/* VPF: mode toggle + value — attached input-group */}
+                            <div className="flex items-center">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -436,9 +442,10 @@ export default function SalaryDetailsPage() {
                                     emp.employeeId,
                                     "vpfMode",
                                     vpfMode === "percent" ? "fixed" : "percent",
+                                    empBasicStr,
                                   )
                                 }
-                                className="h-8 px-2 text-xs rounded border border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors whitespace-nowrap font-mono font-semibold min-w-[40px]"
+                                className="h-8 px-2 text-xs border border-border/60 border-r-0 rounded-l-md bg-muted/40 hover:bg-muted/70 transition-colors whitespace-nowrap font-mono font-semibold min-w-[36px] flex items-center justify-center"
                                 title="Toggle between % and fixed amount"
                                 data-ocid={`salary_details.vpf.toggle.${idx + 1}`}
                               >
@@ -452,9 +459,10 @@ export default function SalaryDetailsPage() {
                                     emp.employeeId,
                                     "vpfValue",
                                     e.target.value,
+                                    empBasicStr,
                                   )
                                 }
-                                className="h-8 text-sm text-gray-900 bg-white border-border/60 w-24"
+                                className="h-8 text-sm text-gray-900 bg-white border-border/60 w-20 rounded-l-none rounded-r-md"
                                 placeholder={
                                   vpfMode === "percent"
                                     ? "% of basic"
@@ -462,9 +470,6 @@ export default function SalaryDetailsPage() {
                                 }
                                 data-ocid={`salary_details.vpf.input.${idx + 1}`}
                               />
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {vpfMode === "percent" ? "% of basic" : "fixed"}
-                              </span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -516,6 +521,7 @@ export default function SalaryDetailsPage() {
                                             i,
                                             e.target.value,
                                             licNos.length,
+                                            empBasicStr,
                                           )
                                         }
                                         className="h-7 text-xs text-gray-900 bg-white border-border/60 w-24"

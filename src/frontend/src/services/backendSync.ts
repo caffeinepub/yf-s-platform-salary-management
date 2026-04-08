@@ -3,7 +3,16 @@
 // added to main.mo after the typed bindings were generated.
 
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
-import { loadConfig } from "../config";
+import envJson from "../../env.json";
+
+type EnvConfig = {
+  backend_host: string;
+  backend_canister_id: string;
+};
+
+function getConfig(): EnvConfig {
+  return envJson as EnvConfig;
+}
 
 // Minimal Candid IDL factory for KV store operations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,7 +78,7 @@ let _actor: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getActor(): Promise<any> {
   if (!_actor) {
-    const config = await loadConfig();
+    const config = getConfig();
     const agent = new HttpAgent({ host: config.backend_host });
     // Fetch root key for local replica only
     if (config.backend_host?.includes("localhost")) {
@@ -139,6 +148,33 @@ export async function syncFromBackend(): Promise<void> {
         localStorage.setItem(key, value);
       }
     }
+    // Also pull empExtra_* keys based on known employees
+    try {
+      const empData = localStorage.getItem("sms_employees");
+      if (empData) {
+        const emps: Array<{ employeeId: string }> = JSON.parse(empData);
+        const empExtraKeys = emps.map((e) => `empExtra_${e.employeeId}`);
+        const extraResults = await Promise.all(
+          empExtraKeys.map(async (key) => {
+            try {
+              const result = await actor.get(key);
+              const value =
+                Array.isArray(result) && result.length > 0 ? result[0] : null;
+              return { key, value };
+            } catch {
+              return { key, value: null };
+            }
+          }),
+        );
+        for (const { key, value } of extraResults) {
+          if (value !== null && value !== undefined) {
+            localStorage.setItem(key, value);
+          }
+        }
+      }
+    } catch {
+      // ignore empExtra pull errors
+    }
     setStatus("ok");
   } catch (err) {
     console.warn("[backendSync] syncFromBackend failed:", err);
@@ -189,6 +225,24 @@ export async function pushAllToBackend(): Promise<void> {
         }
       }),
     );
+    // Also push empExtra_* keys
+    try {
+      const empData = localStorage.getItem("sms_employees");
+      if (empData) {
+        const emps: Array<{ employeeId: string }> = JSON.parse(empData);
+        await Promise.all(
+          emps.map(async (e) => {
+            const key = `empExtra_${e.employeeId}`;
+            const val = localStorage.getItem(key);
+            if (val !== null) {
+              await withRetry(() => actor.set(key, val));
+            }
+          }),
+        );
+      }
+    } catch {
+      // ignore empExtra push errors
+    }
     setStatus("ok");
   } catch (err) {
     console.warn("[backendSync] pushAllToBackend failed:", err);

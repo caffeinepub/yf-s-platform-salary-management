@@ -58,11 +58,11 @@ export default function TallyDashboardPage({ onNavigate }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl gradient-primary glow-primary flex items-center justify-center flex-shrink-0">
           <BookOpen className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-gradient">
+          <h1 className="text-2xl font-display font-bold text-gradient">
             Tally Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -87,7 +87,7 @@ export default function TallyDashboardPage({ onNavigate }: Props) {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="card-glass">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ArrowUpRight className="w-4 h-4 text-red-500" /> Total Debits
@@ -99,7 +99,7 @@ export default function TallyDashboardPage({ onNavigate }: Props) {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-glass">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ArrowDownLeft className="w-4 h-4 text-green-500" /> Total Credits
@@ -111,7 +111,7 @@ export default function TallyDashboardPage({ onNavigate }: Props) {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-glass">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Scale className="w-4 h-4 text-primary" /> Net Balance

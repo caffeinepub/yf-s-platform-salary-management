@@ -446,6 +446,28 @@ function getInstitutes(): string[] {
     return [];
   }
 }
+function getInstituteObjects(): { name: string; shortCode?: string }[] {
+  try {
+    return JSON.parse(localStorage.getItem("sms_institutes") || "[]");
+  } catch {
+    return [];
+  }
+}
+function matchesInstitute(
+  emp: { institute?: string },
+  selectedInstitute: string,
+): boolean {
+  if (selectedInstitute === "all") return true;
+  const instObjects = getInstituteObjects();
+  const inst = instObjects.find(
+    (i) => (i.shortCode || i.name) === selectedInstitute,
+  );
+  return (
+    emp.institute === selectedInstitute ||
+    emp.institute === inst?.name ||
+    emp.institute === inst?.shortCode
+  );
+}
 
 function calcSalaryComponents(emp: StoredEmployee) {
   const basic = Number(emp.basicSalary) || 0;
@@ -547,20 +569,215 @@ export default function ReportsPage() {
     return selectedMonthNum >= 4 ? String(startYear) : String(startYear + 1);
   })();
   const [generating, setGenerating] = useState<string | null>(null);
+  // Per-report download format: 'excel' | 'pdf', defaults to 'excel'
+  const [reportFormats, setReportFormats] = useState<
+    Record<string, "excel" | "pdf">
+  >({});
+  function getReportFormat(repId: string): "excel" | "pdf" {
+    return reportFormats[repId] ?? "excel";
+  }
+  function setReportFormatForId(repId: string, fmt: "excel" | "pdf") {
+    setReportFormats((prev) => ({ ...prev, [repId]: fmt }));
+  }
+
+  function exportReportToExcel(reportId: string, reportLabel: string) {
+    // Build CSV data for the report
+    const headers: string[] = [];
+    const rows: string[][] = [];
+
+    if (reportId === "bank-statement") {
+      const bankFilteredRows =
+        selectedBank === "cheque"
+          ? salaryRows.filter((r) => (r as any).chequePay === 1)
+          : salaryRows.filter((r) => {
+              if ((r as any).chequePay === 1) return false;
+              if (selectedBank !== "all" && r.emp.bankName !== selectedBank)
+                return false;
+              if (
+                selectedBranch !== "all" &&
+                (r.emp as any).bankBranch !== selectedBranch
+              )
+                return false;
+              return true;
+            });
+      headers.push(
+        ...[
+          "Employee Name",
+          "Emp ID",
+          "Account No",
+          "Bank",
+          "IFSC",
+          "Net Amount",
+        ],
+      );
+      for (const r of bankFilteredRows) {
+        rows.push([
+          r.emp.name,
+          r.emp.employeeId,
+          r.emp.bankAccount || "",
+          r.emp.bankName || "",
+          r.emp.ifsc || "",
+          String(r.net || 0),
+        ]);
+      }
+    } else if (
+      reportId === "pf-report" ||
+      reportId === "form-3a" ||
+      reportId === "form-6a"
+    ) {
+      headers.push(
+        ...[
+          "Employee Name",
+          "Emp ID",
+          "PF Account",
+          "Basic",
+          "Employee PF (12%)",
+          "Employer PF (12%)",
+          "Total PF",
+        ],
+      );
+      for (const r of salaryRows) {
+        rows.push([
+          r.emp.name,
+          r.emp.employeeId,
+          r.emp.pfAccount || "",
+          String(r.basic || 0),
+          String(r.pf || 0),
+          String(r.pf || 0),
+          String((r.pf || 0) * 2),
+        ]);
+      }
+    } else if (reportId === "esic-report" || reportId === "esic-challan") {
+      headers.push(
+        ...[
+          "Employee Name",
+          "ESIC No",
+          "Gross Wages",
+          "Employee ESIC (0.75%)",
+          "Employer ESIC (3.25%)",
+          "Total ESIC (4%)",
+        ],
+      );
+      for (const r of salaryRows) {
+        rows.push([
+          r.emp.name,
+          r.emp.esicNo || "",
+          String(r.gross || 0),
+          String(r.esic || 0),
+          String(Math.round((r.gross || 0) * 0.0325)),
+          String(Math.round((r.gross || 0) * 0.04)),
+        ]);
+      }
+    } else if (reportId === "form-16a" || reportId === "it-statement") {
+      headers.push(
+        ...[
+          "Employee Name",
+          "PAN",
+          "Gross",
+          "Standard Deduction",
+          "Taxable Income",
+          "Income Tax",
+        ],
+      );
+      for (const r of salaryRows) {
+        rows.push([
+          r.emp.name,
+          r.emp.pan || "",
+          String((r.gross || 0) * 12),
+          "75000",
+          String(Math.max(0, (r.gross || 0) * 12 - 75000)),
+          String((r.it || 0) * 12),
+        ]);
+      }
+    } else if (reportId === "pt-challan") {
+      headers.push(
+        ...["Employee Name", "Emp ID", "Gross Salary", "PT Slab", "PT Amount"],
+      );
+      for (const r of salaryRows) {
+        const g = r.gross || 0;
+        const ag = g * 12;
+        const slab =
+          ag >= 400000
+            ? "4,00,000 & above"
+            : ag >= 300000
+              ? "3,00,001 - 4,00,000"
+              : ag >= 225000
+                ? "2,25,000 - 3,00,000"
+                : "Below 2,25,000";
+        rows.push([
+          r.emp.name,
+          r.emp.employeeId,
+          String(g),
+          slab,
+          String(r.pt || 0),
+        ]);
+      }
+    } else {
+      headers.push(
+        ...[
+          "Name",
+          "Emp ID",
+          "Designation",
+          "Type",
+          "Basic",
+          "DA",
+          "HRA",
+          "TA",
+          "Gross",
+          "PF",
+          "ESIC",
+          "PT",
+          "IT",
+          "Net Pay",
+        ],
+      );
+      for (const r of salaryRows) {
+        rows.push([
+          r.emp.name,
+          r.emp.employeeId,
+          r.emp.designation || "",
+          r.emp.employmentType,
+          String(r.basic || 0),
+          String(r.da || 0),
+          String(r.hra || 0),
+          String(r.ta || 0),
+          String(r.gross || 0),
+          String(r.pf || 0),
+          String(r.esic || 0),
+          String(r.pt || 0),
+          String(r.it || 0),
+          String(r.net || 0),
+        ]);
+      }
+    }
+
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reportLabel.replace(/\s+/g, "_")}_${selectedMonth}_${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const institutes = getInstitutes();
   const employees = getEmployees();
   const salaries = getSalaries();
 
-  const filteredEmployees = employees.filter(
-    (e) => selectedInstitute === "all" || e.institute === selectedInstitute,
+  const filteredEmployees = employees.filter((e) =>
+    matchesInstitute(e, selectedInstitute),
   );
 
   const salaryRows = filteredEmployees.map((emp) => {
     const saved = salaries.find(
       (s) =>
         s.employeeId === emp.employeeId &&
-        s.month === selectedMonth &&
+        (Number(s.month) === selectedMonthNum || s.month === selectedMonth) &&
         s.year === selectedYear,
     );
     if (saved) return { emp, ...saved };
@@ -819,8 +1036,8 @@ export default function ReportsPage() {
     month: string,
     year: string,
   ): string {
-    const allEmps = getEmployees().filter(
-      (e) => institute === "all" || e.institute === institute,
+    const allEmps = getEmployees().filter((e) =>
+      matchesInstitute(e, institute),
     );
     const allSals = getSalaries();
     const instList: string[] =
@@ -828,7 +1045,12 @@ export default function ReportsPage() {
         ? ([
             ...new Set(allEmps.map((e) => e.institute).filter(Boolean)),
           ] as string[])
-        : [institute];
+        : (() => {
+            const instObj = getInstituteObjects().find(
+              (i) => (i.shortCode || i.name) === institute,
+            );
+            return [instObj?.name || institute];
+          })();
     const cols = [
       "Basic Pay",
       "Special Pay",
@@ -1006,8 +1228,8 @@ export default function ReportsPage() {
       institute === "all"
         ? "Yf's Platform \u2014 Salary Management"
         : institute;
-    const empList = getEmployees().filter(
-      (e) => institute === "all" || e.institute === institute,
+    const empList = getEmployees().filter((e) =>
+      matchesInstitute(e, institute),
     );
     const allSalaries = getSalaries();
 
@@ -2183,7 +2405,7 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                       <Badge variant="outline" className="text-xs">
                         {filteredEmployees.length} employees
                       </Badge>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -2199,14 +2421,51 @@ ${empSections.length ? empSections.join("\n") : `<p style="text-align:center;pad
                             </>
                           )}
                         </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs gap-1 gradient-primary"
-                          onClick={() => generatePDF(rep.id, rep.label)}
-                          disabled={generating === rep.id}
-                        >
-                          <Download className="w-3 h-3" /> PDF
-                        </Button>
+                        {/* Excel/PDF toggle + Download unified button group */}
+                        <div className="flex items-center rounded-lg border border-border/60 overflow-hidden bg-card/60 h-7">
+                          {/* Format toggle */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReportFormatForId(
+                                rep.id,
+                                getReportFormat(rep.id) === "excel"
+                                  ? "pdf"
+                                  : "excel",
+                              )
+                            }
+                            className="flex items-center justify-center px-2 h-full border-r border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors"
+                            title={`Format: ${getReportFormat(rep.id) === "excel" ? "Excel — click for PDF" : "PDF — click for Excel"}`}
+                            data-ocid={`reports.format_toggle.${rep.id}`}
+                          >
+                            {getReportFormat(rep.id) === "excel" ? (
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-green-500" />
+                            ) : (
+                              <FileText className="w-3.5 h-3.5 text-red-500" />
+                            )}
+                          </button>
+                          {/* Download action */}
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 px-2.5 h-full text-xs font-medium text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+                            disabled={generating === rep.id}
+                            data-ocid={`reports.download_button.${rep.id}`}
+                            onClick={() => {
+                              if (getReportFormat(rep.id) === "excel") {
+                                exportReportToExcel(rep.id, rep.label);
+                              } else {
+                                generatePDF(rep.id, rep.label);
+                              }
+                            }}
+                          >
+                            {generating === rep.id ? (
+                              <span className="animate-spin text-xs">⟳</span>
+                            ) : (
+                              <Download className="w-3 h-3" />
+                            )}
+                            Download
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

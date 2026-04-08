@@ -59,11 +59,11 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl gradient-primary glow-primary flex items-center justify-center flex-shrink-0">
           <IndianRupee className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-display font-bold text-gradient">
+          <h1 className="text-2xl font-display font-bold text-gradient">
             Fees Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -87,7 +87,7 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="card-glass">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -100,7 +100,7 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-glass">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
@@ -113,7 +113,7 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-glass">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -126,7 +126,7 @@ export default function FeesDashboardPage({ onNavigate }: Props) {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-glass">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">

@@ -61,6 +61,7 @@ type ContractWorker = {
   institute: string;
   status: WorkerStatus;
   transferredTo?: string;
+  workerType?: string;
 };
 
 type MonthRecord = {
@@ -235,9 +236,19 @@ export default function ContractWorkersPage() {
       ? `${y}-${String(y + 1).slice(-2)}`
       : `${y - 1}-${String(y).slice(-2)}`;
   });
-  const [contractWorkerRate] = useState(() =>
-    Number(localStorage.getItem("contractWorkerRate") || "500"),
-  );
+  function getWorkerRate(workerType?: string): number {
+    if (!workerType)
+      return Number(
+        localStorage.getItem("contractWorkerRate_unskilled") || "500",
+      );
+    const typeKey = workerType
+      .replace(/-/g, "")
+      .replace(/\s/g, "")
+      .toLowerCase();
+    return Number(
+      localStorage.getItem(`contractWorkerRate_${typeKey}`) || "500",
+    );
+  }
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editWorker, setEditWorker] = useState<ContractWorker | null>(null);
   const [statusWorker, setStatusWorker] = useState<{
@@ -252,7 +263,7 @@ export default function ContractWorkersPage() {
   );
   const [deleteRecord, setDeleteRecord] = useState<MonthRecord | null>(null);
   const [showReport, setShowReport] = useState(false);
-  const [form, setForm] = useState({ name: "", institute: "" });
+  const [form, setForm] = useState({ name: "", institute: "", workerType: "" });
   const [transferTo, setTransferTo] = useState("");
 
   const institutes = getInstitutes();
@@ -283,11 +294,20 @@ export default function ContractWorkersPage() {
       toast.error("Name and institute are required.");
       return;
     }
+    if (!form.workerType) {
+      toast.error("Please select worker type.");
+      return;
+    }
     if (editWorker) {
       persist(
         workers.map((w) =>
           w.id === editWorker.id
-            ? { ...w, name: form.name.trim(), institute: form.institute }
+            ? {
+                ...w,
+                name: form.name.trim(),
+                institute: form.institute,
+                workerType: form.workerType,
+              }
             : w,
         ),
       );
@@ -300,11 +320,12 @@ export default function ContractWorkersPage() {
           name: form.name.trim(),
           institute: form.institute,
           status: "active",
+          workerType: form.workerType,
         },
       ]);
       toast.success("Worker added.");
     }
-    setForm({ name: "", institute: "" });
+    setForm({ name: "", institute: "", workerType: "" });
     setEditWorker(null);
     setShowAddDialog(false);
   }
@@ -346,9 +367,10 @@ export default function ContractWorkersPage() {
     if (existing) {
       setAttendanceMap(existing.attendance);
     } else {
+      // Default: all dates = true (present). Unchecked = present, checked = absent.
       const defaultMap: Record<string, boolean> = {};
       for (const d of periodDates) {
-        defaultMap[d] = !isSunday(d);
+        defaultMap[d] = true;
       }
       setAttendanceMap(defaultMap);
     }
@@ -371,7 +393,7 @@ export default function ContractWorkersPage() {
     return Object.values(attendanceMap).filter(Boolean).length;
   }
   function getNetPayable() {
-    return getPresentDays() * contractWorkerRate;
+    return getPresentDays() * getWorkerRate(attendanceWorker?.workerType);
   }
 
   function handleSaveRecord() {
@@ -393,7 +415,7 @@ export default function ContractWorkersPage() {
       year: selYear,
       startDate: periodDates[0],
       endDate: periodDates[periodDates.length - 1],
-      ratePerDay: contractWorkerRate,
+      ratePerDay: getWorkerRate(attendanceWorker?.workerType),
       attendance: { ...attendanceMap },
       presentDays: getPresentDays(),
       netPayable: getNetPayable(),
@@ -417,7 +439,7 @@ export default function ContractWorkersPage() {
     if (attendanceWorker) {
       const defaultMap: Record<string, boolean> = {};
       for (const d of periodDates) {
-        defaultMap[d] = !isSunday(d);
+        defaultMap[d] = true; // default: present
       }
       setAttendanceMap(defaultMap);
     }
@@ -530,7 +552,7 @@ export default function ContractWorkersPage() {
               institutes.length === 0 ? "Please add an institute first" : ""
             }
             onClick={() => {
-              setForm({ name: "", institute: "" });
+              setForm({ name: "", institute: "", workerType: "" });
               setEditWorker(null);
               setShowAddDialog(true);
             }}
@@ -579,11 +601,21 @@ export default function ContractWorkersPage() {
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      className={`text-xs border ${cfg.color} flex items-center gap-1`}
-                    >
-                      {cfg.icon} {cfg.label}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge
+                        className={`text-xs border ${cfg.color} flex items-center gap-1`}
+                      >
+                        {cfg.icon} {cfg.label}
+                      </Badge>
+                      {worker.workerType && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] capitalize border-muted-foreground/30 text-muted-foreground bg-muted/30 px-1.5 py-0.5"
+                        >
+                          {worker.workerType.replace(/-/g, " ")}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -619,6 +651,7 @@ export default function ContractWorkersPage() {
                         setForm({
                           name: worker.name,
                           institute: worker.institute,
+                          workerType: worker.workerType || "",
                         });
                         setShowAddDialog(true);
                       }}
@@ -721,6 +754,25 @@ export default function ContractWorkersPage() {
                       {i}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>
+                Worker Type <span className="text-red-400">*</span>
+              </Label>
+              <Select
+                value={form.workerType}
+                onValueChange={(v) => setForm((f) => ({ ...f, workerType: v }))}
+              >
+                <SelectTrigger className="mt-1" data-ocid="contract.select">
+                  <SelectValue placeholder="Select worker type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unskilled">Unskilled</SelectItem>
+                  <SelectItem value="semi-skilled">Semi-Skilled</SelectItem>
+                  <SelectItem value="skilled">Skilled</SelectItem>
+                  <SelectItem value="highly-skilled">Highly Skilled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -827,7 +879,10 @@ export default function ContractWorkersPage() {
                 </span>
               </div>
               <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                Rate: <strong>₹{contractWorkerRate}/day</strong>
+                Rate:{" "}
+                <strong>
+                  ₹{getWorkerRate(attendanceWorker?.workerType)}/day
+                </strong>
               </span>
             </div>
 
@@ -839,7 +894,7 @@ export default function ContractWorkersPage() {
 
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                Weekday = default present | Sunday = default absent
+                Check dates when worker was absent
               </p>
             </div>
 
@@ -862,7 +917,7 @@ export default function ContractWorkersPage() {
                     }`}
                   >
                     <Checkbox
-                      checked={!!isPresent}
+                      checked={sunday ? isPresent : !isPresent}
                       onCheckedChange={() => !locked && toggleDate(date)}
                       disabled={locked}
                       className="flex-shrink-0"
@@ -917,7 +972,7 @@ export default function ContractWorkersPage() {
                 variant="outline"
                 className="gap-1"
                 onClick={() => {
-                  setForm({ name: "", institute: "" });
+                  setForm({ name: "", institute: "", workerType: "" });
                   setEditWorker(null);
                 }}
               >

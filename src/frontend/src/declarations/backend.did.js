@@ -8,221 +8,25 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const Designation = IDL.Variant({
-  'researchEngineer' : IDL.Null,
-  'professor' : IDL.Null,
-  'lecturer' : IDL.Null,
-  'humanResources' : IDL.Null,
-  'adminStaff' : IDL.Null,
-  'officer' : IDL.Null,
-  'scientist' : IDL.Null,
-});
-export const EmploymentType = IDL.Variant({
-  'regular' : IDL.Null,
-  'temporary' : IDL.Null,
-});
-export const UserRole = IDL.Variant({
-  'admin' : IDL.Null,
-  'user' : IDL.Null,
-  'guest' : IDL.Null,
-});
-export const Employee = IDL.Record({
-  'id' : IDL.Nat,
-  'dob' : IDL.Text,
-  'instituteId' : IDL.Nat,
-  'name' : IDL.Text,
-  'designation' : Designation,
-  'joiningDate' : IDL.Text,
-  'employmentType' : EmploymentType,
-  'employeeId' : IDL.Text,
-  'address' : IDL.Text,
-  'basicSalary' : IDL.Nat,
-});
-export const Institute = IDL.Record({
-  'id' : IDL.Nat,
-  'code' : IDL.Text,
-  'name' : IDL.Text,
-  'location' : IDL.Text,
-});
-export const UserProfile = IDL.Record({
-  'name' : IDL.Text,
-  'employeeId' : IDL.Opt(IDL.Nat),
-});
-
 export const idlService = IDL.Service({
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'addEmployee' : IDL.Func(
-      [
-        IDL.Text,
-        IDL.Text,
-        IDL.Nat,
-        Designation,
-        EmploymentType,
-        IDL.Text,
-        IDL.Text,
-        IDL.Text,
-        IDL.Nat,
-      ],
-      [IDL.Nat],
-      [],
-    ),
-  'addInstitute' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'deleteEmployee' : IDL.Func([IDL.Nat], [], []),
-  'deleteInstitute' : IDL.Func([IDL.Nat], [], []),
-  'getAllEmployeesForInstitute' : IDL.Func(
-      [IDL.Nat],
-      [IDL.Vec(Employee)],
-      ['query'],
-    ),
-  'getAllInstitutes' : IDL.Func([], [IDL.Vec(Institute)], ['query']),
-  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getEmployee' : IDL.Func([IDL.Nat], [Employee], ['query']),
-  'getEmployementForInstituteWithDesignation' : IDL.Func(
-      [IDL.Nat, Designation],
-      [IDL.Vec(Employee)],
-      ['query'],
-    ),
-  'getInstitute' : IDL.Func([IDL.Nat], [Institute], ['query']),
-  'getMyEmployeeData' : IDL.Func([], [IDL.Opt(Employee)], ['query']),
-  'getUserProfile' : IDL.Func(
-      [IDL.Principal],
-      [IDL.Opt(UserProfile)],
-      ['query'],
-    ),
-  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'linkEmployeeToPrincipal' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
-  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'updateEmployee' : IDL.Func(
-      [
-        IDL.Nat,
-        IDL.Text,
-        IDL.Text,
-        IDL.Nat,
-        Designation,
-        EmploymentType,
-        IDL.Text,
-        IDL.Text,
-        IDL.Text,
-        IDL.Nat,
-      ],
-      [],
-      [],
-    ),
-  'updateInstitute' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text, IDL.Text], [], []),
+  'get' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+  'getAll' : IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text))], ['query']),
+  'remove' : IDL.Func([IDL.Text], [], []),
+  'set' : IDL.Func([IDL.Text, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const Designation = IDL.Variant({
-    'researchEngineer' : IDL.Null,
-    'professor' : IDL.Null,
-    'lecturer' : IDL.Null,
-    'humanResources' : IDL.Null,
-    'adminStaff' : IDL.Null,
-    'officer' : IDL.Null,
-    'scientist' : IDL.Null,
-  });
-  const EmploymentType = IDL.Variant({
-    'regular' : IDL.Null,
-    'temporary' : IDL.Null,
-  });
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
-  const Employee = IDL.Record({
-    'id' : IDL.Nat,
-    'dob' : IDL.Text,
-    'instituteId' : IDL.Nat,
-    'name' : IDL.Text,
-    'designation' : Designation,
-    'joiningDate' : IDL.Text,
-    'employmentType' : EmploymentType,
-    'employeeId' : IDL.Text,
-    'address' : IDL.Text,
-    'basicSalary' : IDL.Nat,
-  });
-  const Institute = IDL.Record({
-    'id' : IDL.Nat,
-    'code' : IDL.Text,
-    'name' : IDL.Text,
-    'location' : IDL.Text,
-  });
-  const UserProfile = IDL.Record({
-    'name' : IDL.Text,
-    'employeeId' : IDL.Opt(IDL.Nat),
-  });
-  
   return IDL.Service({
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-    'addEmployee' : IDL.Func(
-        [
-          IDL.Text,
-          IDL.Text,
-          IDL.Nat,
-          Designation,
-          EmploymentType,
-          IDL.Text,
-          IDL.Text,
-          IDL.Text,
-          IDL.Nat,
-        ],
-        [IDL.Nat],
+    'get' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+    'getAll' : IDL.Func(
         [],
-      ),
-    'addInstitute' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
-    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'deleteEmployee' : IDL.Func([IDL.Nat], [], []),
-    'deleteInstitute' : IDL.Func([IDL.Nat], [], []),
-    'getAllEmployeesForInstitute' : IDL.Func(
-        [IDL.Nat],
-        [IDL.Vec(Employee)],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text))],
         ['query'],
       ),
-    'getAllInstitutes' : IDL.Func([], [IDL.Vec(Institute)], ['query']),
-    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getEmployee' : IDL.Func([IDL.Nat], [Employee], ['query']),
-    'getEmployementForInstituteWithDesignation' : IDL.Func(
-        [IDL.Nat, Designation],
-        [IDL.Vec(Employee)],
-        ['query'],
-      ),
-    'getInstitute' : IDL.Func([IDL.Nat], [Institute], ['query']),
-    'getMyEmployeeData' : IDL.Func([], [IDL.Opt(Employee)], ['query']),
-    'getUserProfile' : IDL.Func(
-        [IDL.Principal],
-        [IDL.Opt(UserProfile)],
-        ['query'],
-      ),
-    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'linkEmployeeToPrincipal' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
-    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'updateEmployee' : IDL.Func(
-        [
-          IDL.Nat,
-          IDL.Text,
-          IDL.Text,
-          IDL.Nat,
-          Designation,
-          EmploymentType,
-          IDL.Text,
-          IDL.Text,
-          IDL.Text,
-          IDL.Nat,
-        ],
-        [],
-        [],
-      ),
-    'updateInstitute' : IDL.Func(
-        [IDL.Nat, IDL.Text, IDL.Text, IDL.Text],
-        [],
-        [],
-      ),
+    'remove' : IDL.Func([IDL.Text], [], []),
+    'set' : IDL.Func([IDL.Text, IDL.Text], [], []),
   });
 };
 

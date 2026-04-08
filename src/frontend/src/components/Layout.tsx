@@ -750,21 +750,6 @@ export default function Layout({
             </motion.div>
           </AnimatePresence>
         </main>
-
-        {/* Footer */}
-        <footer className="border-t border-border/30 px-6 py-2 flex-shrink-0">
-          <p className="text-xs text-muted-foreground text-center">
-            &copy; {new Date().getFullYear()}. Built with love using{" "}
-            <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              caffeine.ai
-            </a>
-          </p>
-        </footer>
       </div>
     </div>
   );

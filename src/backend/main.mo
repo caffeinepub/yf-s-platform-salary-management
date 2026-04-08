@@ -2,15 +2,20 @@ import Map "mo:core/Map";
 import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
 
 actor {
   // ── Preserve old stable variables (migration stubs) ──────────────────────
   // These must stay to satisfy M0169 compatibility checks.
 
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
+  type UserRole = { #admin; #guest; #user };
+  type AccessControlState = { var adminAssigned : Bool; userRoles : Map.Map<Principal, UserRole> };
+
+  // Migration stub: accessControlState was previously managed by the caffeineai-authorization library.
+  // It must remain here as a stable variable to satisfy M0169 upgrade compatibility.
+  stable var accessControlState : AccessControlState = {
+    var adminAssigned = false;
+    userRoles = Map.empty<Principal, UserRole>();
+  };
 
   type Institute = { id : Nat; name : Text; code : Text; location : Text };
 

@@ -220,7 +220,8 @@ export default function DashboardPage() {
     {
       label: `${MONTHS[prevMonthIdx]} ${prevYear}`,
       tag: "Previous",
-      tagColor: "bg-slate-600/40 text-slate-100",
+      tagColor:
+        "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-200",
       notProcessed: !prevMonthProcessed,
       ...prevCalc,
     },

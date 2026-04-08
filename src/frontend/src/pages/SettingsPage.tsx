@@ -1140,87 +1140,115 @@ function DailyWorkerRateSection() {
 }
 
 function ContractWorkerRateSection() {
-  const [rate, setRate] = useState(() =>
-    Number(localStorage.getItem("contractWorkerRate") || "500"),
-  );
-  const [editing, setEditing] = useState(false);
-  const [tempRate, setTempRate] = useState(String(rate));
+  const WORKER_TYPES = [
+    { key: "unskilled", label: "Unskilled" },
+    { key: "semiskilled", label: "Semi-Skilled" },
+    { key: "skilled", label: "Skilled" },
+    { key: "highlyskilled", label: "Highly Skilled" },
+  ];
 
-  function handleSave() {
+  const [rates, setRates] = useState<Record<string, number>>(() => {
+    const result: Record<string, number> = {};
+    for (const t of WORKER_TYPES) {
+      result[t.key] = Number(
+        localStorage.getItem(`contractWorkerRate_${t.key}`) || "500",
+      );
+    }
+    return result;
+  });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [tempRate, setTempRate] = useState("");
+
+  function handleEdit(key: string) {
+    setEditing(key);
+    setTempRate(String(rates[key]));
+  }
+
+  function handleSave(key: string) {
     const v = Number(tempRate);
     if (Number.isNaN(v) || v < 0) {
       toast.error("Invalid rate");
       return;
     }
-    localStorage.setItem("contractWorkerRate", String(v));
-    setRate(v);
-    setEditing(false);
+    localStorage.setItem(`contractWorkerRate_${key}`, String(v));
+    setRates((prev) => ({ ...prev, [key]: v }));
+    setEditing(null);
     toast.success("Contract worker rate updated.");
   }
 
   return (
     <Card className="gradient-card cursor-pointer hover:scale-[1.02] transition-transform duration-200">
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent">
-              <Briefcase className="w-5 h-5" />
-            </div>
-            <CardTitle className="text-sm font-display">
-              Contract Worker Rate
-            </CardTitle>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 text-accent">
+            <Briefcase className="w-5 h-5" />
           </div>
-          <Badge
-            variant="secondary"
-            className="text-xs bg-purple-500/20 text-purple-400"
-          >
-            ₹{rate}/day
-          </Badge>
+          <CardTitle className="text-sm font-display">
+            Contract Worker Rates
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         <CardDescription className="text-xs mb-3">
-          Rate per day for contract workers. Used in attendance calculation.
+          Rate per day for each worker type. Used in attendance calculation.
         </CardDescription>
-        {editing ? (
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              min={0}
-              value={tempRate}
-              onChange={(e) => setTempRate(e.target.value)}
-              className="h-8 text-sm"
-              placeholder="Rate per day"
-            />
-            <Button
-              size="sm"
-              className="gradient-primary h-8 text-xs"
-              onClick={handleSave}
+        <div className="grid grid-cols-2 gap-3">
+          {WORKER_TYPES.map((t) => (
+            <div
+              key={t.key}
+              className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-2"
             >
-              Save
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs"
-              onClick={() => {
-                setEditing(false);
-                setTempRate(String(rate));
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs gap-1"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="w-3 h-3" /> Edit Rate
-          </Button>
-        )}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-foreground">
+                  {t.label}
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="text-xs bg-purple-500/20 text-purple-400"
+                >
+                  ₹{rates[t.key]}/day
+                </Badge>
+              </div>
+              {editing === t.key ? (
+                <div className="flex gap-1.5">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={tempRate}
+                    onChange={(e) => setTempRate(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    placeholder="Rate/day"
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    className="gradient-primary h-7 text-xs px-2"
+                    onClick={() => handleSave(t.key)}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setEditing(null)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs gap-1 w-full"
+                  onClick={() => handleEdit(t.key)}
+                >
+                  <Pencil className="w-3 h-3" /> Edit Rate
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

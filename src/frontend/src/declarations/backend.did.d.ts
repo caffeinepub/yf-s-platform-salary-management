@@ -10,88 +10,11 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export type Designation = { 'researchEngineer' : null } |
-  { 'professor' : null } |
-  { 'lecturer' : null } |
-  { 'humanResources' : null } |
-  { 'adminStaff' : null } |
-  { 'officer' : null } |
-  { 'scientist' : null };
-export interface Employee {
-  'id' : bigint,
-  'dob' : string,
-  'instituteId' : bigint,
-  'name' : string,
-  'designation' : Designation,
-  'joiningDate' : string,
-  'employmentType' : EmploymentType,
-  'employeeId' : string,
-  'address' : string,
-  'basicSalary' : bigint,
-}
-export type EmploymentType = { 'regular' : null } |
-  { 'temporary' : null };
-export interface Institute {
-  'id' : bigint,
-  'code' : string,
-  'name' : string,
-  'location' : string,
-}
-export interface UserProfile { 'name' : string, 'employeeId' : [] | [bigint] }
-export type UserRole = { 'admin' : null } |
-  { 'user' : null } |
-  { 'guest' : null };
 export interface _SERVICE {
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'addEmployee' : ActorMethod<
-    [
-      string,
-      string,
-      bigint,
-      Designation,
-      EmploymentType,
-      string,
-      string,
-      string,
-      bigint,
-    ],
-    bigint
-  >,
-  'addInstitute' : ActorMethod<[string, string, string], bigint>,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'deleteEmployee' : ActorMethod<[bigint], undefined>,
-  'deleteInstitute' : ActorMethod<[bigint], undefined>,
-  'getAllEmployeesForInstitute' : ActorMethod<[bigint], Array<Employee>>,
-  'getAllInstitutes' : ActorMethod<[], Array<Institute>>,
-  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getEmployee' : ActorMethod<[bigint], Employee>,
-  'getEmployementForInstituteWithDesignation' : ActorMethod<
-    [bigint, Designation],
-    Array<Employee>
-  >,
-  'getInstitute' : ActorMethod<[bigint], Institute>,
-  'getMyEmployeeData' : ActorMethod<[], [] | [Employee]>,
-  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
-  'isCallerAdmin' : ActorMethod<[], boolean>,
-  'linkEmployeeToPrincipal' : ActorMethod<[bigint, Principal], undefined>,
-  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'updateEmployee' : ActorMethod<
-    [
-      bigint,
-      string,
-      string,
-      bigint,
-      Designation,
-      EmploymentType,
-      string,
-      string,
-      string,
-      bigint,
-    ],
-    undefined
-  >,
-  'updateInstitute' : ActorMethod<[bigint, string, string, string], undefined>,
+  'get' : ActorMethod<[string], [] | [string]>,
+  'getAll' : ActorMethod<[], Array<[string, string]>>,
+  'remove' : ActorMethod<[string], undefined>,
+  'set' : ActorMethod<[string, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

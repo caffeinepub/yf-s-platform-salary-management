@@ -20,6 +20,7 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import {
+  useGetAllEmployees,
   useGetAllInstitutes,
   useGetEmployeesForInstitute,
   useGetSalary,
@@ -43,7 +44,7 @@ function isActiveEmployee(emp: { employeeId?: string; id?: bigint }): boolean {
   if (!empId) return true;
   const extra = getEmpExtra(empId);
   const status = extra.employeeStatus || "Active";
-  return status === "Active" || status === "" || !status;
+  return !status || status === "" || status.toLowerCase() === "active";
 }
 
 const MONTH_NAMES = [
@@ -100,9 +101,9 @@ function getSessionMonths(
     }
   } else {
     for (let m = 4; m <= 12; m++)
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     for (let m = 1; m <= 3; m++)
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
   }
   return months.reverse();
 }
@@ -137,7 +138,9 @@ export default function PayslipPage() {
   const year = getYearFromSession(session, month);
 
   const { data: institutes = [] } = useGetAllInstitutes();
-  const { data: rawEmployees = [] } = useGetEmployeesForInstitute(instituteId);
+  const { data: allEmps = [] } = useGetAllEmployees();
+  const { data: instEmps = [] } = useGetEmployeesForInstitute(instituteId);
+  const rawEmployees = instituteId === null ? allEmps : instEmps;
   const employees = rawEmployees.filter(isActiveEmployee);
   const { data: salary, isLoading } = useGetSalary(employeeId, month, year);
 

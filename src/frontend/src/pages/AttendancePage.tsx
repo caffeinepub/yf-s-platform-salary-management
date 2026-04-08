@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   CalendarCheck,
@@ -31,6 +32,7 @@ import {
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { localGetAttendance, localSaveAttendance } from "../hooks/localStore";
 import {
   useDeleteAttendance,
   useGetAllEmployees,
@@ -56,10 +58,10 @@ function getEmpExtra(employeeId: string) {
 function isActiveEmployee(emp: { employeeId: string }): boolean {
   const extra = getEmpExtra(emp.employeeId);
   const status = extra.employeeStatus || "Active";
-  return status === "Active" || status === "" || !status;
+  return !status || status === "" || status.toLowerCase() === "active";
 }
 
-const MONTH_NAMES = [
+const _MONTH_NAMES = [
   "January",
   "February",
   "March",
@@ -110,9 +112,9 @@ function getSessionMonths(
   } else {
     // Past session: show all 12 months Apr-Mar
     for (let m = 4; m <= 12; m++)
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
     for (let m = 1; m <= 3; m++)
-      months.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+      months.push({ value: String(m), label: SHORT_MONTH[m - 1] });
   }
   return months.reverse();
 }
@@ -172,6 +174,11 @@ function getPeriodDays(month: number, year: number): PeriodDay[] {
   return result;
 }
 
+/** Count working days (non-Sundays) in a period */
+function getWorkingDays(month: number, year: number): number {
+  return getPeriodDays(month, year).filter((d) => !d.isSunday).length;
+}
+
 function buildDefaultStatuses(
   month: number,
   year: number,
@@ -204,7 +211,9 @@ const LEAVE_COLORS: Record<string, string> = {
   default: "bg-card border-border",
 };
 
-function getDayColor(data: DayData): string {
+function getDayColor(data: DayData, isSunday: boolean): string {
+  // Sundays that are present: neutral/default (not green)
+  if (isSunday && data.status === "present") return LEAVE_COLORS.default;
   if (data.status === "present") return LEAVE_COLORS.present;
   if (data.status === "halfday") return LEAVE_COLORS.halfday;
   if (data.status === "holiday") return LEAVE_COLORS.holiday_PH;
@@ -233,8 +242,40 @@ function getLatestMonthForSession(session: string): number {
   return 3; // Past session - latest is March
 }
 
+/** Build tooltip text from attendance days for a given filter (absent or LWP) */
+function buildLeaveTooltip(
+  days: string[],
+  mode: "absent" | "lwp",
+  periodDays: PeriodDay[],
+): string {
+  const lines: string[] = [];
+  for (const entry of days) {
+    const { key, data } = parseDayEntry(entry);
+    const pd = periodDays.find((d) => d.key === key);
+    if (!pd) continue;
+    const dateStr = `${pd.date} ${SHORT_MONTH[pd.month - 1]}`;
+    if (
+      mode === "lwp" &&
+      data.status === "absent" &&
+      data.leaveType === "LWP"
+    ) {
+      lines.push(`${dateStr} — LWP`);
+    } else if (
+      mode === "absent" &&
+      data.status === "absent" &&
+      data.leaveType !== "LWP"
+    ) {
+      lines.push(`${dateStr} — ${data.leaveType ?? "Absent"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 export default function AttendancePage() {
   const now = new Date();
+  const qc = useQueryClient();
+  const [savingEmpId, setSavingEmpId] = useState<string | null>(null);
+  const [savedEmpIds, setSavedEmpIds] = useState<Set<string>>(new Set());
   const [instituteId, setInstituteId] = useState<string>("all");
   const [employeeSelection, setEmployeeSelection] = useState<bigint | "all">(
     "all",
@@ -596,7 +637,7 @@ export default function AttendancePage() {
                 <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5">
                   {periodDays.map((day) => {
                     const data = getDayData(day.key);
-                    const colorClass = getDayColor(data);
+                    const colorClass = getDayColor(data, day.isSunday);
                     const label = getDayLabel(data);
                     return (
                       <button
@@ -640,6 +681,7 @@ export default function AttendancePage() {
                     { color: "bg-purple-500", label: "HPL" },
                     { color: "bg-pink-500", label: "ML" },
                     { color: "bg-slate-500", label: "PH" },
+                    { color: "bg-card border border-border", label: "Sunday" },
                   ].map((l) => (
                     <span key={l.label} className="flex items-center gap-1">
                       <span
@@ -708,7 +750,7 @@ export default function AttendancePage() {
                             });
                             setDayStatuses(buildDefaultStatuses(month, year));
                             setConfirmDelete(false);
-                            toast.error("Attendance deleted");
+                            toast.success("Attendance deleted");
                           } catch {
                             toast.error("Failed to delete attendance");
                           }
@@ -780,7 +822,24 @@ export default function AttendancePage() {
                         <th className="text-left py-2 px-3 text-muted-foreground font-medium">
                           Type
                         </th>
-                        <th className="py-2 px-3" />
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium text-xs whitespace-nowrap">
+                          Working Days
+                        </th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium text-xs whitespace-nowrap">
+                          Present
+                        </th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium text-xs whitespace-nowrap">
+                          Absent
+                        </th>
+                        <th className="text-center py-2 px-2 text-muted-foreground font-medium text-xs whitespace-nowrap">
+                          LWP
+                        </th>
+                        <th className="py-2 px-3 text-center text-muted-foreground font-medium text-xs">
+                          View
+                        </th>
+                        <th className="py-2 px-3 text-center text-muted-foreground font-medium text-xs">
+                          Save
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -802,6 +861,106 @@ export default function AttendancePage() {
                         })();
                         const designation =
                           extra.designation || emp.designation;
+
+                        const empIdNum = Number(emp.id);
+                        const savedRec = localGetAttendance(
+                          empIdNum,
+                          month,
+                          derivedYear,
+                        );
+                        const periodDaysAll = getPeriodDays(month, derivedYear);
+                        const workingDays = getWorkingDays(month, derivedYear);
+
+                        // Default values: working days / 0 / 0 until attendance is saved
+                        let presentCount: number = workingDays;
+                        let absentCount = 0;
+                        let lwpCount = 0;
+                        let hasSavedData = false;
+
+                        if (savedRec && savedRec.days.length > 0) {
+                          hasSavedData = true;
+                          presentCount = 0;
+                          absentCount = 0;
+                          lwpCount = 0;
+                          for (const dayEntry of savedRec.days) {
+                            const { data } = parseDayEntry(dayEntry);
+                            if (
+                              data.status === "present" ||
+                              data.status === "halfday"
+                            ) {
+                              presentCount++;
+                            } else {
+                              absentCount++;
+                              if (data.leaveType === "LWP") lwpCount++;
+                            }
+                          }
+                          // Days not in record default to present
+                          const recordedKeys = new Set(
+                            savedRec.days.map((d) => d.split(":")[0]),
+                          );
+                          for (const pd of periodDaysAll) {
+                            if (!recordedKeys.has(pd.key)) presentCount++;
+                          }
+                          absentCount = periodDaysAll.length - presentCount;
+                        }
+
+                        // Build tooltip text for absent/lwp hover
+                        const absentTooltip =
+                          hasSavedData && absentCount > 0
+                            ? buildLeaveTooltip(
+                                savedRec!.days,
+                                "absent",
+                                periodDaysAll,
+                              )
+                            : "";
+                        const lwpTooltip =
+                          hasSavedData && lwpCount > 0
+                            ? buildLeaveTooltip(
+                                savedRec!.days,
+                                "lwp",
+                                periodDaysAll,
+                              )
+                            : "";
+
+                        const empKey = emp.id.toString();
+                        const isSaving = savingEmpId === empKey;
+                        const isSaved = savedEmpIds.has(empKey);
+
+                        async function handleInlineSave() {
+                          // If no saved record, generate default attendance (all present) and save
+                          const daysToSave: string[] = savedRec
+                            ? savedRec.days
+                            : periodDaysAll.map((pd) => `${pd.key}:present`);
+
+                          if (savedRec?.isLocked) {
+                            toast.success("Attendance already saved.");
+                            setSavedEmpIds(
+                              (prev) => new Set([...prev, empKey]),
+                            );
+                            return;
+                          }
+                          setSavingEmpId(empKey);
+                          try {
+                            localSaveAttendance(
+                              empIdNum,
+                              month,
+                              derivedYear,
+                              daysToSave,
+                            );
+                            qc.invalidateQueries({
+                              queryKey: ["attendance"],
+                            });
+                            setSavedEmpIds(
+                              (prev) => new Set([...prev, empKey]),
+                            );
+                            toast.success(`Attendance saved for ${emp.name}`);
+                          } catch {
+                            toast.error("Failed to save attendance");
+                          } finally {
+                            setSavingEmpId(null);
+                          }
+                        }
+
                         return (
                           <tr
                             key={emp.id.toString()}
@@ -817,7 +976,47 @@ export default function AttendancePage() {
                             <td className="py-2 px-3 text-muted-foreground capitalize">
                               {emp.employmentType}
                             </td>
-                            <td className="py-2 px-3 text-right">
+                            <td className="py-2 px-2 text-center text-xs font-medium">
+                              {workingDays}
+                            </td>
+                            <td className="py-2 px-2 text-center text-xs font-medium text-green-500">
+                              {presentCount}
+                            </td>
+                            {/* Absent cell with hover tooltip */}
+                            <td className="py-2 px-2 text-center text-xs font-medium text-amber-500">
+                              {absentCount > 0 && absentTooltip ? (
+                                <div className="relative group inline-block cursor-help">
+                                  <span className="underline decoration-dotted">
+                                    {absentCount}
+                                  </span>
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 hidden group-hover:block min-w-[140px] max-w-[200px]">
+                                    <div className="bg-popover border border-border rounded-md shadow-lg px-2.5 py-2 text-left whitespace-pre-line text-[10px] text-popover-foreground leading-relaxed">
+                                      {absentTooltip}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                absentCount
+                              )}
+                            </td>
+                            {/* LWP cell with hover tooltip */}
+                            <td className="py-2 px-2 text-center text-xs font-medium text-red-500">
+                              {lwpCount > 0 && lwpTooltip ? (
+                                <div className="relative group inline-block cursor-help">
+                                  <span className="underline decoration-dotted">
+                                    {lwpCount}
+                                  </span>
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 hidden group-hover:block min-w-[140px] max-w-[200px]">
+                                    <div className="bg-popover border border-border rounded-md shadow-lg px-2.5 py-2 text-left whitespace-pre-line text-[10px] text-popover-foreground leading-relaxed">
+                                      {lwpTooltip}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                lwpCount
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-center">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -827,6 +1026,29 @@ export default function AttendancePage() {
                               >
                                 View
                               </Button>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {isSaved || savedRec?.isLocked ? (
+                                <span className="text-xs text-green-500 font-medium flex items-center justify-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" /> Saved
+                                </span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                                  onClick={handleInlineSave}
+                                  disabled={isSaving}
+                                  data-ocid={`attendance.save_button.${idx + 1}`}
+                                >
+                                  {isSaving ? (
+                                    <span className="animate-spin">⟳</span>
+                                  ) : (
+                                    <Save className="w-3 h-3" />
+                                  )}
+                                  Save
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         );

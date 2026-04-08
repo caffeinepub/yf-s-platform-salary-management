@@ -44,14 +44,10 @@ import {
   Building2,
   Calendar,
   Camera,
-  Car,
   CreditCard,
   DollarSign,
   Download,
-  FileSpreadsheet,
-  FileText,
   FileUp,
-  Filter,
   History,
   Landmark,
   Loader2,
@@ -83,6 +79,7 @@ import {
   useGetEmployeesForInstitute,
   useUpdateEmployee,
 } from "../hooks/useQueries";
+import { syncKeyToBackend } from "../services/backendSync";
 import { formatDate } from "../utils/dateUtils";
 
 const DESIGNATIONS: string[] = [
@@ -286,10 +283,10 @@ const BANK_NAMES: string[] = [
 ];
 
 const BANK_BRANCHES: Record<string, string[]> = {
-  "Bank of India": ["Indpapuri"],
+  "Bank of India": ["Indrapuri"],
   "ICICI Bank": ["Arera Colony"],
   "UCO Bank": ["Piplani"],
-  "HDFC Bank": ["Indpapuri"],
+  "HDFC Bank": ["Indrapuri"],
   "State Bank of India": ["(HET) Piplani", "(K.H) Habibganj"],
 };
 
@@ -564,7 +561,7 @@ const EMPTY_FORM: EmpForm = {
   department: "",
   instituteId: "",
   address: "",
-  bhelQuarter: "",
+  bhelQuarter: "no",
   profilePic: "",
   dob: "",
   religion: "",
@@ -598,7 +595,9 @@ function getEmpExtra(employeeId: string): any {
   }
 }
 function saveEmpExtra(employeeId: string, data: any) {
-  localStorage.setItem(`empExtra_${employeeId}`, JSON.stringify(data));
+  const serialized = JSON.stringify(data);
+  localStorage.setItem(`empExtra_${employeeId}`, serialized);
+  syncKeyToBackend(`empExtra_${employeeId}`, serialized);
 }
 
 function parseDateToISO(val: string | number | undefined | null): string {
@@ -767,7 +766,7 @@ export default function EmployeeManagementPage() {
       department: extra.department || "",
       instituteId: emp.instituteId.toString(),
       address: emp.address,
-      bhelQuarter: extra.bhelQuarter || "",
+      bhelQuarter: extra.bhelQuarter || "no",
       profilePic: extra.profilePic || "",
       dob: emp.dob,
       religion: extra.religion || "",
@@ -788,7 +787,7 @@ export default function EmployeeManagementPage() {
         const branches = getMergedBankBranches()[bn] || [];
         return branches.length === 1 ? branches[0] : "";
       })(),
-      bankAccountNo: extra.bankAccountNo || extra.bankAccount || "",
+      bankAccountNo: String(extra.bankAccountNo || extra.bankAccount || ""),
       ifscCode: extra.ifscCode || "",
       panNo: extra.panNo || extra.panNumber || "",
       pfNumber: extra.pfNumber || extra.pfAccount || "",
@@ -857,7 +856,7 @@ export default function EmployeeManagementPage() {
         "+919876543210",
         "john@example.com",
         "Bank of India",
-        "Indpapuri",
+        "Indrapuri",
         "0012345678901",
         "123456789",
         "123 Main Street",
@@ -1253,7 +1252,7 @@ export default function EmployeeManagementPage() {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
-      toast.error("Employee deleted");
+      toast.success("Employee deleted");
       setDeleteTarget(null);
     } catch {
       toast.error("Delete failed");
@@ -1327,131 +1326,172 @@ export default function EmployeeManagementPage() {
           >
             <Download className="w-4 h-4" /> Sample File
           </Button>
-          <div className="flex items-center gap-1 border border-border/60 rounded-lg p-0.5 bg-muted/40">
+          <div
+            className="flex items-center rounded-lg border border-border/60 overflow-hidden bg-card/60 h-9"
+            data-ocid="employees.download_toggle"
+          >
+            {/* Left: icon toggle - click to switch format */}
             <button
               type="button"
-              title="Download as Excel"
-              onClick={() => setDownloadFormat("excel")}
-              className={`p-1.5 rounded transition-colors ${downloadFormat === "excel" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() =>
+                setDownloadFormat(downloadFormat === "excel" ? "pdf" : "excel")
+              }
+              className="flex items-center justify-center px-2.5 h-full border-r border-border/60 bg-muted/40 hover:bg-muted/70 transition-colors"
+              title={`Currently: ${downloadFormat === "excel" ? "Excel" : "PDF"} — click to switch`}
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              {downloadFormat === "excel" ? (
+                <img
+                  src="/assets/icons8-excel-100-019d61e2-4dd2-757d-bda6-75b5b55d7b42.png"
+                  className="w-5 h-5"
+                  alt="Excel"
+                />
+              ) : (
+                <img
+                  src="/assets/icons8-pdf-100-019d61e2-4dd8-759b-ad23-e6e539020f73.png"
+                  className="w-5 h-5"
+                  alt="PDF"
+                />
+              )}
             </button>
+            {/* Right: download action */}
             <button
               type="button"
-              title="Download as PDF"
-              onClick={() => setDownloadFormat("pdf")}
-              className={`p-1.5 rounded transition-colors ${downloadFormat === "pdf" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <FileText className="w-4 h-4" />
-            </button>
-          </div>
-          <Button
-            variant="outline"
-            className="gap-2 border-green-500/40 text-green-500 hover:bg-green-500/10"
-            onClick={() => {
-              // Build CSV from filtered employees
-              const headers = [
-                "staffno",
-                "name",
-                "fatherName",
-                "dob",
-                "gender",
-                "religion",
-                "category",
-                "designation",
-                "department",
-                "employeeType",
-                "status",
-                "joiningDate",
-                "address",
-                "phone",
-                "email",
-                "bankName",
-                "bankBranch",
-                "accountNo",
-                "ifsc",
-                "licNos",
-                "basicSalary",
-                "ta",
-                "vpf",
-                "institute",
-              ];
-              const rows = employees.map((emp: any) => {
-                const ex = getEmpExtra(emp.employeeId);
-                return [
-                  emp.employeeId,
-                  emp.name,
-                  ex.fatherName || "",
-                  emp.dob || "",
-                  ex.gender || "",
-                  ex.religion || "",
-                  ex.category || "",
-                  ex.designation || emp.designation || "",
-                  ex.department || "",
-                  String(emp.employmentType),
-                  ex.employeeStatus || "active",
-                  emp.joiningDate || "",
-                  (emp.address || "").replace(/,/g, ";"),
-                  ex.phone || "",
-                  ex.emailId || "",
-                  ex.bankName || "",
-                  ex.bankBranch || "",
-                  ex.bankAccountNo || "",
-                  ex.ifscCode || "",
-                  Array.isArray(ex.licNos)
-                    ? ex.licNos.join(";")
-                    : ex.licNo || "",
-                  Number(emp.basicSalary) || 0,
-                  ex.ta || 0,
-                  ex.vpfValue || 0,
-                  ex.institute || "",
-                ]
-                  .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-                  .join(",");
-              });
-              if (downloadFormat === "pdf") {
-                // PDF download via print window
-                const tableRows = employees
-                  .map((emp: any) => {
-                    const ex = getEmpExtra(emp.employeeId);
-                    return `<tr>
-                    <td>${emp.employeeId}</td><td>${emp.name}</td>
+              className="flex items-center gap-1.5 px-3 h-full text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-500/10 transition-colors whitespace-nowrap"
+              onClick={() => {
+                // Build CSV from filtered employees
+                const headers = [
+                  "staffno",
+                  "name",
+                  "fatherName",
+                  "dob",
+                  "gender",
+                  "religion",
+                  "category",
+                  "designation",
+                  "department",
+                  "employeeType",
+                  "status",
+                  "joiningDate",
+                  "address",
+                  "phone",
+                  "email",
+                  "bankName",
+                  "bankBranch",
+                  "accountNo",
+                  "ifsc",
+                  "licNos",
+                  "basicSalary",
+                  "ta",
+                  "vpf",
+                  "institute",
+                ];
+                const rows = employees.map((emp: any) => {
+                  const ex = getEmpExtra(emp.employeeId);
+                  return [
+                    emp.employeeId,
+                    emp.name,
+                    ex.fatherName || "",
+                    emp.dob || "",
+                    ex.gender || "",
+                    ex.religion || "",
+                    ex.category || "",
+                    ex.designation || emp.designation || "",
+                    ex.department || "",
+                    String(emp.employmentType),
+                    ex.employeeStatus || "active",
+                    emp.joiningDate || "",
+                    (emp.address || "").replace(/,/g, ";"),
+                    ex.phone || "",
+                    ex.emailId || "",
+                    ex.bankName || "",
+                    ex.bankBranch || "",
+                    String(ex.bankAccountNo || ""),
+                    ex.ifscCode || "",
+                    Array.isArray(ex.licNos)
+                      ? ex.licNos.join(";")
+                      : ex.licNo || "",
+                    Number(emp.basicSalary) || 0,
+                    ex.ta || 0,
+                    ex.vpfValue || 0,
+                    (() => {
+                      const inst = institutes.find(
+                        (i: any) =>
+                          i.id.toString() === emp.instituteId.toString(),
+                      );
+                      return (
+                        (inst as any)?.shortCode ||
+                        inst?.name ||
+                        ex.institute ||
+                        ""
+                      );
+                    })(),
+                  ]
+                    .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+                    .join(",");
+                });
+                if (downloadFormat === "pdf") {
+                  // PDF download via print window — landscape with all columns
+                  const tableRows = employees
+                    .map((emp: any) => {
+                      const ex = getEmpExtra(emp.employeeId);
+                      return `<tr>
+                    <td>${emp.employeeId}</td>
+                    <td>${emp.name}</td>
                     <td>${ex.designation || emp.designation || ""}</td>
                     <td>${ex.department || ""}</td>
                     <td>${String(emp.employmentType)}</td>
+                    <td>${ex.employeeStatus || "active"}</td>
                     <td>${emp.joiningDate || ""}</td>
+                    <td>${emp.dob || ""}</td>
                     <td>${ex.phone || ""}</td>
-                    <td>${ex.bankName || ""} ${ex.bankBranch || ""}</td>
-                    <td>${ex.bankAccountNo || ""}</td>
+                    <td>${ex.emailId || ""}</td>
+                    <td>${ex.bankName || ""}</td>
+                    <td>${ex.bankBranch || ""}</td>
+                    <td>${String(ex.bankAccountNo || "")}</td>
+                    <td>${ex.ifscCode || ""}</td>
+                    <td>${ex.panNo || ""}</td>
+                    <td>${ex.pfNumber || ""}</td>
+                    <td>${(() => {
+                      const inst = institutes.find(
+                        (i) => i.id.toString() === emp.instituteId.toString(),
+                      );
+                      return inst?.shortCode || inst?.name || "";
+                    })()}</td>
                   </tr>`;
-                  })
-                  .join("");
-                const html = `<!DOCTYPE html><html><head><title>Employees</title>
-                <style>body{font-family:Arial,sans-serif;font-size:11px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;}th{background:#f5f5f5;font-weight:bold;}h2{margin-bottom:8px;}</style></head>
-                <body><h2>Employee List — ${new Date().toLocaleDateString("en-IN")}</h2>
-                <table><thead><tr><th>Staff No</th><th>Name</th><th>Designation</th><th>Dept</th><th>Type</th><th>DOJ</th><th>Phone</th><th>Bank</th><th>Account No</th></tr></thead>
+                    })
+                    .join("");
+                  const html = `<!DOCTYPE html><html><head><title>Employee Details</title>
+                <style>@page{size:A4 landscape;margin:10mm;}body{font-family:Arial,sans-serif;font-size:8px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:3px 4px;text-align:left;word-break:break-all;}th{background:#f5f5f5;font-weight:bold;}h2{margin-bottom:6px;font-size:12px;}</style></head>
+                <body><h2>Employee Details — ${new Date().toLocaleDateString("en-IN")}</h2>
+                <table><thead><tr>
+                  <th>Staff No</th><th>Name</th><th>Designation</th><th>Dept</th><th>Type</th><th>Status</th>
+                  <th>DOJ</th><th>DOB</th><th>Phone</th><th>Email</th>
+                  <th>Bank Name</th><th>Branch</th><th>A/C No</th><th>IFSC</th><th>PAN No</th><th>PF No</th><th>Institute</th>
+                </tr></thead>
                 <tbody>${tableRows}</tbody></table></body></html>`;
-                const w = window.open("", "_blank");
-                if (w) {
-                  w.document.write(html);
-                  w.document.close();
-                  w.print();
+                  const w = window.open("", "_blank");
+                  if (w) {
+                    w.document.write(html);
+                    w.document.close();
+                    w.print();
+                  }
+                } else {
+                  const csv = [headers.join(","), ...rows].join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
                 }
-              } else {
-                const csv = [headers.join(","), ...rows].join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }
-            }}
-            data-ocid="employees.download_button"
-          >
-            <Download className="w-4 h-4" /> Download Employees
-          </Button>
+              }}
+              data-ocid="employees.download_button"
+            >
+              <Download className="w-4 h-4" />
+              Employee Detail's
+            </button>
+          </div>
           <Button
             variant="outline"
             className="gap-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1528,7 +1568,7 @@ export default function EmployeeManagementPage() {
                 <SelectItem value="all">All Institutes</SelectItem>
                 {institutes.map((i: Institute) => (
                   <SelectItem key={i.id.toString()} value={i.id.toString()}>
-                    {i.name}
+                    {(i as any).shortCode || i.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1942,8 +1982,8 @@ export default function EmployeeManagementPage() {
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[250px] overflow-y-auto">
-                        <SelectItem value="yes">Yes</SelectItem>
                         <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2459,7 +2499,7 @@ export default function EmployeeManagementPage() {
               onClick={async () => {
                 try {
                   await deleteAllMutation.mutateAsync();
-                  toast.error("All employees deleted");
+                  toast.success("All employees deleted");
                   setShowDeleteAllDialog(false);
                 } catch {
                   toast.error("Failed to delete employees");
